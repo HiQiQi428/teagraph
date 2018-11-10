@@ -6,12 +6,23 @@ import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.luncert.teagraph.cypher.CypherVisitor;
 import org.luncert.teagraph.cypher.CypherParser.*;
+import org.luncert.teagraph.cypher.cypherObject.CCypher;
+import org.luncert.teagraph.cypher.cypherObject.CMultiPartQuery;
+import org.luncert.teagraph.cypher.cypherObject.CQuery;
+import org.luncert.teagraph.cypher.cypherObject.CRegularQuery;
+import org.luncert.teagraph.cypher.cypherObject.CReturn;
+import org.luncert.teagraph.cypher.cypherObject.CSinglePartQuery;
+import org.luncert.teagraph.cypher.cypherObject.CSingleQuery;
+import org.luncert.teagraph.cypher.cypherObject.CStandaloneCall;
+import org.luncert.teagraph.cypher.cypherObject.CStatement;
+import org.luncert.teagraph.cypher.cypherObject.CUnion;
+import org.luncert.teagraph.cypher.cypherObject.ReadingClause;
+import org.luncert.teagraph.cypher.cypherObject.UpdatingClause;
 
 public class CVisitor implements CypherVisitor<Object> {
 
     public Object visit(ParseTree tree) {
-        visitCypher((CypherContext)tree);
-        return null;
+        return visitCypher((CypherContext)tree);
     }
 
     public Object visitChildren(RuleNode node) {
@@ -29,55 +40,105 @@ public class CVisitor implements CypherVisitor<Object> {
     // entity
 
     public Object visitCypher(CypherContext ctx) {
-        CVFlow flow = new CVFlow().addStep(
-            new CVPiece(
-                (t) -> (t instanceof StatementContext),
-                (t) -> visitStatement(StatementContext.class.cast(t))
-            ));
-        return new CVHelper().addStep(flow).handle(ctx);
+        // statement
+        CCypher cypher = new CCypher();
+
+        return new SPiece(
+            (t) -> (t instanceof StatementContext),
+            (t, d) -> ((CCypher) d).setStatement((CStatement) visitStatement((StatementContext) t)))
+        .handle(ctx, cypher);
     }
 
     public Object visitStatement(StatementContext ctx) {
-        CVOption option = new CVOption().addOption(
-            new CVPiece(
-                (t) -> (t instanceof QueryContext),
-                (t) -> visitQuery(QueryContext.class.cast(t))
-            ));
-        return new CVHelper().addStep(option).handle(ctx);
+        // query
+        CStatement statement = new CStatement();
+
+        return new SPiece(
+            (t) -> (t instanceof QueryContext),
+            (t, d) -> ((CStatement) d).setQuery((CQuery) visitQuery((QueryContext) t)))
+        .handle(ctx, statement);
     }
 
     public Object visitQuery(QueryContext ctx) {
-        CVOption c = new CVOption().addOption(
-            new CVPiece(
+        // regularQuery | standaloneCall
+        CQuery query = new CQuery();
+
+        return new SOption().addOption(
+            new SPiece(
                 (t) -> (t instanceof RegularQueryContext),
-                (t) -> visitRegularQuery(RegularQueryContext.class.cast(t))
-            ))
-        .addOption(
-            new CVPiece(
+                (t, d) -> ((CQuery)d).setRegularQuery((CRegularQuery) visitRegularQuery((RegularQueryContext) t))
+            )).addOption(
+            new SPiece(
                 (t) -> (t instanceof SingleQueryContext),
-                (t) -> visitSingleQuery(SingleQueryContext.class.cast(t))
-            ));
-        return new CVHelper().addStep(c).handle(ctx);
+                (t, d) -> ((CQuery)d).setStandaloneCall((CStandaloneCall) visitSingleQuery((SingleQueryContext)t))
+            )).handle(ctx, query);
     }
 
     @Override
     public Object visitRegularQuery(RegularQueryContext ctx) {
-        CVFlow flow = new CVFlow().addStep(
-            new CVPiece(
+        // singleQuery union*
+        CRegularQuery rq = new CRegularQuery();
+        return new SFlow().addStep(
+            new SPiece(
                 (t) -> (t instanceof SingleQueryContext),
-                (t) -> visitSingleQuery(SingleQueryContext.class.cast(t))
-            ));
-        return null;
+                (t, d) -> ((CRegularQuery)d).setSingleQuery((CSingleQuery) visitSingleQuery((SingleQueryContext) t))
+            ), null).addStep(
+            new SPiece(
+                (t) -> (t instanceof UnionContext),
+                (t, d) -> ((CRegularQuery)d).getUnions().add((CUnion) visitUnion((UnionContext)t))
+            ), "*").handle(ctx, rq);
     }
 
     @Override
     public Object visitSingleQuery(SingleQueryContext ctx) {
-        return null;
+        // singlePartQuery | multiPartQuery
+        CSingleQuery singleQuery = new CSingleQuery();
+
+        return new SOption().addOption(
+            new SPiece(
+                (t) -> (t instanceof SinglePartQueryContext),
+                (t, d) ->  ((CSingleQuery)d).setSinglePartQuery((CSinglePartQuery) visitSinglePartQuery((SinglePartQueryContext) t))
+            )).addOption(
+            new SPiece(
+                (t) -> (t instanceof MultiPartQueryContext),
+                (t, d) -> ((CSingleQuery)d).setMultiPartQuery((CMultiPartQuery) visitMultiPartQuery((MultiPartQueryContext) t))
+            )).handle(ctx, singleQuery);
     }
 
     @Override
     public Object visitUnion(UnionContext ctx) {
-        return null;
+        // (rw_union SP rw_all SP? singleQuery) | (rw_union SP? singleQuery)
+        CUnion cunion = new CUnion();
+
+        SFlow f1 = new SFlow().addStep(
+            new SPiece(
+                (t) -> (t instanceof Rw_unionContext), null
+            ), null).addStep(
+            new SPiece(
+                (t) -> (t instanceof Rw_allContext),
+                (t, d) -> ((CUnion)d).setAll(true)
+            ), null).addStep(
+            new SPiece(
+                (t) -> (t instanceof SingleQueryContext),
+                (t, d) -> {
+                    Object sq = visitSingleQuery(SingleQueryContext.class.cast(t));
+                    ((CUnion)d).setSingleQuery((CSingleQuery) sq);
+                }
+            ), null);
+
+        SFlow f2 = new SFlow().addStep(
+            new SPiece(
+                (t) -> (t instanceof Rw_unionContext), null
+            ), null).addStep(
+            new SPiece(
+                (t) -> (t instanceof SingleQueryContext),
+                (t, d) -> visitSingleQuery(SingleQueryContext.class.cast(t))
+            ), null);
+
+        return new SOption()
+            .addOption(f1)
+            .addOption(f2)
+            .handle(ctx, cunion);
     }
 
     @Override
@@ -122,17 +183,52 @@ public class CVisitor implements CypherVisitor<Object> {
 
     @Override
     public Object visitSinglePartQuery(SinglePartQueryContext ctx) {
-        return null;
+        // readingClause* updatingClause* ret?
+        CSinglePartQuery spq = new CSinglePartQuery();
+
+        return new SFlow().addStep(
+            new SPiece(
+                (t) -> (t instanceof ReadingClauseContext),
+                (t, d) -> ((CSinglePartQuery) d).getReadingClauses().add((ReadingClause) visitReadingClause((ReadingClauseContext) t))
+            ), "*").addStep(
+            new SPiece(
+                (t) -> (t instanceof UpdatingClauseContext),
+                (t, d) -> ((CSinglePartQuery) d).getUpdatingClauses().add((UpdatingClause) visitUpdatingClause((UpdatingClauseContext) t))
+            ), "*").addStep(
+            new SPiece(
+                (t) -> (t instanceof RetContext),
+                (t, d) -> ((CSinglePartQuery) d).setCreturn((CReturn) visitRet((RetContext) t))
+            ), "?").handle(ctx, spq);
     }
 
     @Override
     public Object visitReadingClause(ReadingClauseContext ctx) {
-        return null;
+        // match | unwind | inQueryCall
+        assert (ctx.getChildCount() == 1);
+        ParseTree t = ctx.getChild(0);
+        if (t instanceof MatchContext)
+            return visitMatch((MatchContext) t);
+        else if (t instanceof UnwindContext)
+            return visitUnwind((UnwindContext) t);
+        else
+            return visitInQueryCall((InQueryCallContext) t);
     }
 
     @Override
     public Object visitUpdatingClause(UpdatingClauseContext ctx) {
-        return null;
+        // create | merge | delete | set | remove
+        assert (ctx.getChildCount() == 1);
+        ParseTree t = ctx.getChild(0);
+        if (t instanceof CreateContext)
+            return visitCreate((CreateContext) t);
+        else if (t instanceof MergeContext)
+            return visitMerge((MergeContext) t);
+        else if (t instanceof DeleteContext)
+            return visitDelete((DeleteContext) t);
+        else if (t instanceof SetContext)
+            return visitSet((SetContext) t);
+        else
+            return visitRemove((RemoveContext) t);
     }
 
     @Override

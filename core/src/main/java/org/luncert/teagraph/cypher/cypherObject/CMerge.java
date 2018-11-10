@@ -4,7 +4,10 @@ import java.util.List;
 
 import org.luncert.teagraph.cypher.cypherObject.nonpiece.CPatternPart;
 
-public class CMerge {
+import lombok.Data;
+
+@Data
+public class CMerge extends UpdatingClause {
 
     public static class CMergeAction {
 

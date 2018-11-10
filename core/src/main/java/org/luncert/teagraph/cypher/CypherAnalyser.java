@@ -16,7 +16,6 @@ public class CypherAnalyser {
         ParseTree tree = parser.cypher();
         CVisitor visitor = new CVisitor();
         System.out.println(visitor.visit(tree));
-
     }
 
    

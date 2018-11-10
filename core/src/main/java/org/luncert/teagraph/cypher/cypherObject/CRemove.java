@@ -6,7 +6,10 @@ import org.luncert.teagraph.cypher.cypherObject.nonpiece.CNodeLabels;
 import org.luncert.teagraph.cypher.cypherObject.nonpiece.CPropertyExpression;
 import org.luncert.teagraph.cypher.cypherObject.nonpiece.CVariable;
 
-public class CRemove {
+import lombok.Data;
+
+@Data
+public class CRemove extends UpdatingClause {
 
     private interface CRemoveItem {}
 

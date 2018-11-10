@@ -1,6 +1,9 @@
 package org.luncert.teagraph.cypher.cypherObject;
 
-public class CInQueryCall {
+import lombok.Data;
+
+@Data
+public class CInQueryCall extends ReadingClause {
 
     Object explicitProcedureInvocation;
     Object params;

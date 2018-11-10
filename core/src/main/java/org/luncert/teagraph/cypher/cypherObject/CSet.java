@@ -7,7 +7,10 @@ import org.luncert.teagraph.cypher.cypherObject.nonpiece.CNodeLabels;
 import org.luncert.teagraph.cypher.cypherObject.nonpiece.CPropertyExpression;
 import org.luncert.teagraph.cypher.cypherObject.nonpiece.CVariable;
 
-public class CSet {
+import lombok.Data;
+
+@Data
+public class CSet extends UpdatingClause {
 
     private interface CSetItem {}
 
