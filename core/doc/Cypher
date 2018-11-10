@@ -68,6 +68,7 @@ mergeAction : (rw_on SP rw_match SP set)
 patternElement : (nodePattern (SP? patternElementChain)*)
     | ('(' patternElement ')')
     ;
+// or: '(' nodePattern (SP? patternElementChain)* ')'
 
 patternElementChain : relationshipPattern SP? nodePattern ;
 

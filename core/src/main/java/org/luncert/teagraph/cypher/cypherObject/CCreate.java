@@ -1,5 +1,9 @@
 package org.luncert.teagraph.cypher.cypherObject;
 
-public class CCreate extends CObject {
+import org.luncert.teagraph.cypher.cypherObject.nonpiece.CPattern;
+
+public class CCreate {
+
+    CPattern pattern;
 
 }

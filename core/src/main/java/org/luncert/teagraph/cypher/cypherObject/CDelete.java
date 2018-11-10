@@ -1,9 +1,12 @@
 package org.luncert.teagraph.cypher.cypherObject;
 
+import java.util.List;
+
 import org.luncert.teagraph.cypher.cypherObject.nonpiece.CExpression;
 
-public class CWhere {
+public class CDelete {
 
-    CExpression expression;
-    
+    boolean detach;
+    List<CExpression> expressions;
+
 }

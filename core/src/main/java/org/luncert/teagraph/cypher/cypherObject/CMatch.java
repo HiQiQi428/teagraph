@@ -1,11 +1,14 @@
 package org.luncert.teagraph.cypher.cypherObject;
 
+import org.luncert.teagraph.cypher.cypherObject.nonpiece.CPattern;
+
 /**
  * MATCH (n:Actor)
  */
-public class CMatch extends CObject {
+public class CMatch {
 
-    CPattern cpattern;
-    CWhere cwhere;
+    boolean optional;
+    CPattern pattern;
+    CWhere where;
 
 }

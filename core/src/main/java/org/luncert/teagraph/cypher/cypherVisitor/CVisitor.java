@@ -1,43 +1,13 @@
-package org.luncert.teagraph.cypher;
-
-import java.util.LinkedList;
-import java.util.List;
-import java.util.function.Function;
-import java.util.function.Predicate;
+package org.luncert.teagraph.cypher.cypherVisitor;
 
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.luncert.teagraph.cypher.CypherVisitor;
 import org.luncert.teagraph.cypher.CypherParser.*;
 
 public class CVisitor implements CypherVisitor<Object> {
-
-    private static class Observer {
-
-        List<Predicate<ParseTree>> pls = new LinkedList<>();
-        List<Function<ParseTree, Object>> fls = new LinkedList<>();
-
-        Observer regisOption(Predicate<ParseTree> check, Function<ParseTree, Object> handle) {
-            pls.add(check);
-            fls.add(handle);
-            return this;
-        }
-
-        Object handle(ParseTree tree) {
-            ParseTree tmp;
-            int listenerSize = pls.size();
-            for (int i = 0, limit = tree.getChildCount(); i < limit; i++) {
-                tmp = tree.getChild(i);
-                for (int j = 0; j < listenerSize; j++) {
-                    if (pls.get(j).test(tmp))
-                        return fls.get(j).apply(tmp);
-                }
-            }
-            return null;
-        }
-
-    }
 
     public Object visit(ParseTree tree) {
         visitCypher((CypherContext)tree);
@@ -59,54 +29,50 @@ public class CVisitor implements CypherVisitor<Object> {
     // entity
 
     public Object visitCypher(CypherContext ctx) {
-        return new Observer()
-        .regisOption(
-            (t) -> (t instanceof StatementContext),
-            (t) -> visitStatement(StatementContext.class.cast(t))
-        ).handle(ctx);
+        CVFlow flow = new CVFlow().addStep(
+            new CVPiece(
+                (t) -> (t instanceof StatementContext),
+                (t) -> visitStatement(StatementContext.class.cast(t))
+            ));
+        return new CVHelper().addStep(flow).handle(ctx);
     }
 
     public Object visitStatement(StatementContext ctx) {
-        return new Observer()
-        .regisOption(
-            (t) -> (t instanceof QueryContext),
-            (t) -> visitQuery(QueryContext.class.cast(t))
-        ).handle(ctx);
+        CVOption option = new CVOption().addOption(
+            new CVPiece(
+                (t) -> (t instanceof QueryContext),
+                (t) -> visitQuery(QueryContext.class.cast(t))
+            ));
+        return new CVHelper().addStep(option).handle(ctx);
     }
 
     public Object visitQuery(QueryContext ctx) {
-        return new Observer()
-        .regisOption(
-            (t) -> (t instanceof RegularQueryContext),
-            (t) -> visitRegularQuery(RegularQueryContext.class.cast(t))
-        ).regisOption(
-            (t) -> (t instanceof SingleQueryContext),
-            (t) -> visitSingleQuery(SingleQueryContext.class.cast(t))
-        ).handle(ctx);
+        CVOption c = new CVOption().addOption(
+            new CVPiece(
+                (t) -> (t instanceof RegularQueryContext),
+                (t) -> visitRegularQuery(RegularQueryContext.class.cast(t))
+            ))
+        .addOption(
+            new CVPiece(
+                (t) -> (t instanceof SingleQueryContext),
+                (t) -> visitSingleQuery(SingleQueryContext.class.cast(t))
+            ));
+        return new CVHelper().addStep(c).handle(ctx);
     }
 
     @Override
     public Object visitRegularQuery(RegularQueryContext ctx) {
-        return new Observer()
-        .regisOption(
-            (t) -> (t instanceof SingleQueryContext),
-            (t) -> visitSingleQuery(SingleQueryContext.class.cast(t))
-        ).regisOption(
-            (t) -> (t instanceof UnionContext),
-            (t) -> visitUnion(UnionContext.class.cast(t))
-        ).handle(ctx);
+        CVFlow flow = new CVFlow().addStep(
+            new CVPiece(
+                (t) -> (t instanceof SingleQueryContext),
+                (t) -> visitSingleQuery(SingleQueryContext.class.cast(t))
+            ));
+        return null;
     }
 
     @Override
     public Object visitSingleQuery(SingleQueryContext ctx) {
-        return new Observer()
-        .regisOption(
-            (t) -> (t instanceof SinglePartQueryContext),
-            (t) -> visitSinglePartQuery(SinglePartQueryContext.class.cast(t))
-        ).regisOption(
-            (t) -> (t instanceof MultiPartQueryContext),
-            (t) -> visitMultiPartQuery(MultiPartQueryContext.class.cast(t))
-        ).handle(ctx);
+        return null;
     }
 
     @Override
