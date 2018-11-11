@@ -1,10 +1,12 @@
 package org.luncert.teagraph.cypher;
 
+import java.io.FileInputStream;
+
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
-import org.luncert.teagraph.cypher.cypherVisitor.CVisitor;
+import org.luncert.teagraph.cypher.astResolver.AstResolver;
 
 public class CypherAnalyser {
 
@@ -14,10 +16,14 @@ public class CypherAnalyser {
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         CypherParser parser = new CypherParser(tokens);
         ParseTree tree = parser.cypher();
-        CVisitor visitor = new CVisitor();
-        System.out.println(visitor.visit(tree));
+
+        AstResolver resolver = new AstResolver();
+        try {
+			resolver.init(new FileInputStream("src/main/resource/CypherSolution.xml"));
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+        resolver.resolve(tree);
     }
 
-   
-    
 }

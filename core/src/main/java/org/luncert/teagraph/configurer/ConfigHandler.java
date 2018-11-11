@@ -4,11 +4,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.luncert.teagraph.configurer.Configuration.AuthPair;
-import org.luncert.teagraph.configurer.RouteTree.Node;
-import org.luncert.teagraph.configurer.RouteTree.Node.NodeContext;
-import org.luncert.teagraph.configurer.annotations.Characters;
-import org.luncert.teagraph.configurer.annotations.StartDocument;
-import org.luncert.teagraph.configurer.annotations.StartElement;
+import org.luncert.teagraph.util.xml.RouteTree.Node;
+import org.luncert.teagraph.util.xml.RouteTree.Node.NodeContext;
+import org.luncert.teagraph.util.xml.annotations.Characters;
+import org.luncert.teagraph.util.xml.annotations.StartDocument;
+import org.luncert.teagraph.util.xml.annotations.StartElement;
 import org.xml.sax.Attributes;
 
 public class ConfigHandler {

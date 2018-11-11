@@ -13,7 +13,8 @@ public class TestConfigurer {
     public void test() throws Exception {
         String resPath = Paths.get(System.getProperty("user.dir"), "src/main/resource").toString();
         System.setProperty("TEAGRAPH_HOME", resPath);
-        Configurer.loadConfiguration();
+        Configuration config = Configurer.loadConfiguration();
+        System.out.println(config);
     }
 
 }
