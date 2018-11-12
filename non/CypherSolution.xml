@@ -1,0 +1,83 @@
+<!-- 
+attrBind: bind attribute,如果不指定则默认使用标签名作为属性名,element指向的标签会用目标标签名作为属性名
+标签默认为dynamic object,字节点作为属性
+element标签只能有repeat属性
+ -->
+
+<resolver>
+    <var>
+        <readingClause>
+            <options>
+                <match text="true" />
+                <unwind text="true" />
+                <inQueryCall text="true" />
+            </options>
+        </readingClause>
+        <updatingClause>
+            <options>
+                <create text="true" />
+                <merge text="true" />
+                <delete text="true" />
+                <set text="true" />
+                <remove text="true" />
+            </options>
+        </updatingClause>
+        <ret>
+            <rw_return ignore="true" />
+            <rw_distinct repeat="?" attrBind="distinct" bool="true" />
+            <returnBody text="true" />
+        </ret>
+        <singlePartQuery>
+            <readingClause ref="true" repeat="*" />
+            <options>
+                <ret ref="true" />
+                <element>
+                    <updatingClause ref="true" repeat="*" />
+                    <ret ref="true" repeat="?" />
+                </element>
+            </options>
+        </singlePartQuery>
+        <singleQuery>
+            <options>
+                <singlePartQuery ref="true" />
+                <multiPartQuery>
+                    <element repeat="*">
+                        <readingClause ref="true" repeat="*" />
+                        <updatingClause ref="true" repeat="*" />
+                        <with ignore="true" />
+                    </element>
+                    <singlePartQuery ref="true" />
+                </multiPartQuery>
+            </options>
+        </singleQuery>
+    </var>
+
+    <ignore>
+        org.antlr.v4.runtime.tree.TerminalNodeImpl
+    </ignore>
+
+    <classpath>
+        org.luncert.teagraph.cypher.CypherParser
+    </classpath>
+
+    <solution>
+        <cypher>
+            <statement>
+                <query>
+                    <options>
+                        <regularQuery>
+                            <singleQuery ref="true" />
+                            <union repeat="*">
+                                <rw_union ignore="true" />
+                                <rw_all repeat="?" attrBind="all" bool="true"/>
+                                <singleQuery ref="true" />
+                            </union>
+                        </regularQuery>
+                        <!-- not supported now -->
+                        <!-- <standaloneCall text="true" /> -->
+                    </options>
+                </query>
+            </statement>
+        </cypher>
+    </solution>
+</resolver>

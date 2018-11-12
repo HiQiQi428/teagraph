@@ -46,6 +46,10 @@ public class CypherHandler extends DefaultHandler {
     }
 
     public void characters(char ch[], int start, int length) throws SAXException {
+        String text = String.copyValueOf(ch, start, length).trim();
+        if (text.length() > 0) {
+            node.setAttr("content", text);
+        }
     }
 
     public void endElement(String uri, String localName, String qName) throws SAXException {

@@ -70,8 +70,10 @@ public class DynamicNode {
     public String toString() {
         StringBuilder builder = new StringBuilder()
                 .append("DynamicNode(")
-                .append("attrs=").append(attrs)
-                .append("),children=").append(children).append("])");
+                .append("name=").append(name)
+                .append(",attrs=").append(attrs)
+                .append(",childCount=").append(children.size())
+                .append(")");
         return builder.toString();
     }
 

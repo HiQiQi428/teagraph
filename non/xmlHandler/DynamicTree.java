@@ -25,8 +25,8 @@ public class DynamicTree {
 
         DynamicNode node = root, pre = root;
         int i = 0;
-        // 尝试找到目标节点的父亲
-        for (int limit = p.length - 1; node != null && i < limit; i++) {
+        // 尝试找到目标节点
+        for (; node != null && i < p.length; i++) {
             pre = node;
             node = node.match(p[i]);
         }

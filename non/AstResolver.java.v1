@@ -1,0 +1,297 @@
+package org.luncert.teagraph.cypher.astResolver;
+
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.luncert.teagraph.cypher.astResolver.DynamicBean;
+import org.luncert.teagraph.cypher.astResolver.xmlHandler.CypherHandler;
+import org.luncert.teagraph.cypher.astResolver.xmlHandler.DynamicNode;
+import org.luncert.teagraph.cypher.astResolver.xmlHandler.DynamicTree;
+
+public class AstResolver {
+
+    private static final String DT_PATH_VAR = "resolver/var";
+    private static final String DT_PATH_IGNORE = "resolver/ignore";
+    private static final String DT_PATH_CLASSPATH = "resolver/classpath";
+    private static final String DT_PATH_SOLUTION = "resolver/solution";
+
+    private DynamicTree tree;
+    private Map<String, DynamicNode> vars;
+    private Set<String> ignores;
+    private String classpath;
+    private DynamicNode root; // solution
+
+    public void init(InputStream xmlInput) throws Exception {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        SAXParser parser = factory.newSAXParser();
+        CypherHandler handler = new CypherHandler();
+        parser.parse(xmlInput, handler);
+        tree = handler.getTree();
+
+        DynamicNode node;
+        // init var
+        vars = new HashMap<>();
+        node = tree.match(DT_PATH_VAR);
+        if (node != null)
+            for (DynamicNode tmp : node.getChildren())
+                vars.put(tmp.getName(), tmp);
+        // init ignore
+        ignores = new HashSet<>();
+        node = tree.match(DT_PATH_IGNORE);
+        if (node != null) {
+            for (String item : ((String) node.getAttr("content")).split(","))
+                ignores.add(item);
+        }
+        // init classpath
+        node = tree.match(DT_PATH_CLASSPATH);
+        if (node != null)
+            classpath = (String) node.getAttr("content");
+        else throw new AstError("connot find element <classpath>");
+        // init root
+        node = tree.match(DT_PATH_SOLUTION);
+        if (node != null)
+            root = node.getFirstChild();
+        else throw new AstError("connot find element <solution>");
+    }
+
+    /**
+     * 帮助处理一个ParseTree的孩子
+     */
+    private class ParseTreeList {
+
+        private int cursor, size;
+        private ParseTree parent;
+
+        ParseTreeList(ParseTree parent) {
+            cursor = -1;
+            size = parent.getChildCount();
+            this.parent = parent;
+        }
+
+        boolean hasNext() {
+            return cursor < size;
+        }
+
+        ParseTree next() {
+            return hasNext() ? parent.getChild(++cursor) : null;
+        }
+
+        ParseTree nextAstNode() {
+            ParseTree astNode;
+            while ((astNode = next()) != null) {
+                if (!ignores.contains(getClassName(astNode)))
+                    return astNode;
+            }
+            return astNode;
+        }
+
+        boolean available() {
+            return cursor >= 0 && cursor < size;
+        }
+
+        ParseTree current() {
+            return available() ? parent.getChild(cursor) : null;
+        }
+
+        int createShotcut() {
+            return cursor;
+        }
+
+        void recovery(int shotcut) {
+            cursor = shotcut;
+        }
+
+    }
+
+    private String getClassName(Object object) {
+        return object.getClass().getName();
+    }
+
+    private DynamicNode referenceReplace(DynamicNode node) {
+        if ("true".equals(node.getAttr("ref"))) {
+            String refName = node.getName();
+            DynamicNode var = vars.get(refName);
+            if (var != null) return var;
+            else throw new AstError("invalid refName: " + refName);
+        }
+        else return node; // 不替换
+    }
+
+    private boolean check(String tagName, ParseTree tree) {
+        String typeName = new StringBuilder()
+            .append(classpath).append("$")
+            .append(tagName.substring(0, 1).toUpperCase())
+            .append(tagName.substring(1)).append("Context")
+            .toString();
+        return getClassName(tree).equals(typeName);
+    }
+
+    /**
+     * @param node
+     * @param ast
+     * @return null:当ignore为true
+     */
+    private Object resolveNodeSubFlow(DynamicNode node, ParseTree ast) {
+        Object value = null;
+        if ("true".equals(node.getAttr("ignore"))) {}
+        else if ("true".equals(node.getAttr("bool"))) {
+            value = check(node.getName(), ast);
+        }
+        else if ("true".equals(node.getAttr("text"))) {
+            value = ast.getText();
+        }
+        else {
+            value = new DynamicBean();
+            resolve((DynamicBean) value, node, new ParseTreeList(ast));
+        }
+        return value;
+    }
+
+    private boolean resolveNode(DynamicBean parentBean, DynamicNode node, ParseTreeList astList, boolean throwable) {
+        String attrName = Optional.ofNullable((String) node.getAttr("attrBind")).orElse(node.getName());
+        ParseTree astNode = astList.current();
+        String repeat = (String) node.getAttr("repeat");
+        if (repeat == null) {
+            if (!check(node.getName(), astNode)) {
+                if (throwable)
+                    throw new AstError("match failed: " + node.getName() + " -> " + getClassName(astNode));
+                return false;
+            }
+            Object value = resolveNodeSubFlow(node, astNode);
+            astNode = astList.nextAstNode();
+            if (value != null) // 如果value为null表示ignore
+                parentBean.setAttr(attrName, value); // 输出到parentBean
+        }
+        else if (repeat.equals("?")) {
+            // 判断是否匹配,如果不匹配,则直接转到下一个dynamicNode
+            if (check(node.getName(), astNode)) {
+                Object value = resolveNodeSubFlow(node, astNode);
+                astNode = astList.nextAstNode();
+                if (value != null)
+                    parentBean.setAttr(attrName, value); // 输出到parentBean
+            }
+        }
+        else if (repeat.equals("*") || repeat.equals("+")) {
+            List<Object> values = new ArrayList<>();
+            while (astList.available() && check(node.getName(), astNode)) {
+                Object value = resolveNodeSubFlow(node, astNode);
+                if (value != null) {
+                    values.add(value);
+                    astNode = astList.nextAstNode();
+                }
+            }
+            if (repeat.equals("+") && values.size() == 0) {
+                if (throwable)
+                    throw new AstError("repeat '+' not match: " + node.getName());
+                return false;
+            }
+            parentBean.setAttr(attrName, values); // 输出到parentBean
+        }
+        else throw new AstError("invalid repeat character");
+        return true;
+    }
+
+    /**
+     * 对element进行展开
+     */
+    private boolean resolveElement(DynamicBean parentBean, DynamicNode node, ParseTreeList astList, boolean throwable) {
+        String attrName = Optional.ofNullable((String) node.getAttr("attrBind")).orElse(node.getName());
+        String repeat = (String) node.getAttr("repeat");
+        if (repeat == null) {
+            DynamicBean bean = new DynamicBean();
+            for (DynamicNode child : node.getChildren())
+                resolve(bean, child, astList, throwable);
+            parentBean.setAttr(attrName, bean);
+        }
+        else if (repeat.equals("?")) {
+            DynamicBean bean = new DynamicBean();
+            int shotcut = astList.createShotcut();
+            Iterator<DynamicNode> iterator = node.getChildren().iterator();
+            for (DynamicNode child; iterator.hasNext();) {
+                child = iterator.next();
+                if (!resolve(bean, child, astList, false)) {
+                    astList.recovery(shotcut);
+                    break;
+                }
+            }
+            // 如果遍历不是正常结束的话,就直接忽略了,因为'?'
+            if (!iterator.hasNext())
+                parentBean.setAttr(attrName, bean);
+        }
+        else if (repeat.equals("*") || repeat.equals("+")) {
+            List<Object> elements = new ArrayList<>();
+            while (true) {
+                DynamicBean bean = new DynamicBean();
+                int shotcut = astList.createShotcut();
+                for (DynamicNode child : node.getChildren()) {
+                    if (!resolve(bean, child, astList, false)) {
+                        astList.recovery(shotcut);
+                        if (repeat.equals("+") && elements.size() == 0) {
+                            if (throwable)
+                                throw new AstError("repeat '+' not match: " + node.getName());
+                            return false;
+                        }
+                        parentBean.setAttr(attrName, elements); // 输出到parentBean
+                    }
+                }
+                elements.add(bean);
+            }
+
+        }
+        else throw new AstError("invalid repeat character");
+        return true;
+    }
+
+    /**
+     * options选择
+     */
+    private boolean resolveOptions(DynamicBean parentBean, DynamicNode node, ParseTreeList astList, boolean throwable) {
+        ParseTree astNode = astList.current();
+        for (DynamicNode option : node.getChildren()) {
+            if (check(option.getName(), astNode)) {
+                node = referenceReplace(option); // 它作出了选择,于是用选项替换options,展开的孩子节点需要进行reference替换
+                resolve(parentBean, node, astList, throwable);
+                return true;
+            }
+        }
+        if (throwable)
+            throw new AstError("resolve options failed: " + getClassName(astList.nextAstNode()));
+        return false;
+    }
+
+    private boolean resolve(DynamicBean parentBean, DynamicNode base, ParseTreeList astList, boolean throwable) {
+        for (DynamicNode node : base.getChildren()) {
+            node = referenceReplace(node);
+            if ("options".equals(node.getName())) {
+                if (!resolveOptions(parentBean, node, astList, throwable))
+                    return false;
+            }
+            else if ("element".equals(node.getName())) {
+                if (!resolveElement(parentBean, node, astList, throwable)) {
+                    return false;
+                }
+            }
+            else resolveNode(parentBean, node, astList, true);
+        }
+        return true;
+    }
+
+    public DynamicBean resolve(ParseTree ast) {
+        DynamicBean cypherBean = new DynamicBean();
+        resolve(cypherBean, root, new ParseTreeList(ast), true);
+        System.out.println(cypherBean);
+        return cypherBean;
+    }
+
+}
