@@ -1,0 +1,132 @@
+package org.luncert.tkgdb;
+
+import java.io.File;
+import java.nio.file.Paths;
+import java.util.Optional;
+
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.recipes.locks.InterProcessMutex;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.CreateMode;
+import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Result;
+import org.neo4j.graphdb.Transaction;
+import org.neo4j.graphdb.factory.GraphDatabaseFactory;
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
+
+public class TKGWorker {
+
+    private static final String WMUTEX_PATH = "/curator/zkg/writeLock";
+    private static final String RMUTEX_PATH = "/curator/zkg/readLock";
+    private static final String AMUTEX_PATH = "/curator/zkg/assistantLock";
+    private static final String WNUM_PATH = "/curator/zkg/writeNum";
+    private static final String RNUM_PATH = "/curator/zkg/readNum";
+
+    private CuratorFramework client;
+
+    private InterProcessMutex wmutex, rmutex, amutex;
+
+    private GraphDatabaseService graphDb;
+
+    public TKGWorker() {}
+
+    public void init() throws Exception {
+        // 创建zookeeper客户端
+        RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+        client = CuratorFrameworkFactory.newClient("127.0.0.1:2180,127.0.0.1:2181,127.0.0.1:2182", retryPolicy);
+        client.start();
+        // 创建分布式锁
+        wmutex = new InterProcessMutex(client, WMUTEX_PATH);
+        rmutex = new InterProcessMutex(client, RMUTEX_PATH);
+        amutex = new InterProcessMutex(client, AMUTEX_PATH);
+        if (client.checkExists().forPath(WNUM_PATH) == null) {
+            client.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(WNUM_PATH);
+            client.setData().forPath(WNUM_PATH, Util.intToByteArray(0));
+        }
+        if (client.checkExists().forPath(RNUM_PATH) == null) {
+            client.create().creatingParentsIfNeeded().withMode(CreateMode.EPHEMERAL).forPath(RNUM_PATH);
+            client.setData().forPath(RNUM_PATH, Util.intToByteArray(0));
+        }
+        // 启动Neo4j实例
+        File dbStoreDir = Paths.get(System.getProperty("user.dir"), "db").toFile();
+        graphDb = new GraphDatabaseFactory()
+            .newEmbeddedDatabaseBuilder(dbStoreDir)
+            .setConfig(GraphDatabaseSettings.pagecache_memory, "512M")
+            .setConfig(GraphDatabaseSettings.string_block_size, "60")
+            .setConfig(GraphDatabaseSettings.array_block_size, "300")
+            .setConfig(GraphDatabaseSettings.bolt_ssl_policy, "true")
+            .newGraphDatabase();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            graphDb.shutdown();
+            client.close();
+        }));
+    }
+
+    public Result execute(String query, boolean isReadOp) {
+        Transaction tx = graphDb.beginTx();
+        Result result = null;
+        try {
+            tx.success();
+            if (isReadOp) {
+                amutex.acquire();
+                rmutex.acquire();
+                Integer rnum = Optional.ofNullable(client.getData().forPath(RNUM_PATH))
+                    .map(ba -> Util.byteArrayToInt(ba)).get();
+                if (rnum != null) {
+                    client.setData().forPath(RNUM_PATH, Util.intToByteArray(rnum + 1));
+                    if (rnum == 0)
+                        wmutex.acquire();
+                    rmutex.release();
+                    amutex.release();
+
+                    result = graphDb.execute(query);
+
+                    // dec writer counter
+                    if ((rnum = Optional.ofNullable(client.getData().forPath(RNUM_PATH))
+                            .map(ba -> Util.byteArrayToInt(ba)).get()) != null)
+                    {
+                        client.setData().forPath(RNUM_PATH, Util.intToByteArray(rnum - 1));
+                        if (rnum == 1)
+                            wmutex.release();
+                    }
+                }
+                else {
+                    rmutex.release();
+                    amutex.release();
+                }
+            }
+            else {
+                Integer wnum = Optional.ofNullable(client.getData().forPath(WNUM_PATH))
+                    .map(ba -> Util.byteArrayToInt(ba)).get();
+                if (wnum != null) {
+                    client.setData().forPath(WNUM_PATH, Util.intToByteArray(wnum + 1));
+                    if (wnum == 0)
+                        rmutex.acquire();
+
+                    wmutex.acquire();
+                    result = graphDb.execute(query);
+                    wmutex.release();
+
+                    // dec writer counter
+                    if ((wnum = Optional.ofNullable(client.getData().forPath(WNUM_PATH))
+                            .map(ba -> Util.byteArrayToInt(ba)).get()) != null)
+                    {
+                        client.setData().forPath(WNUM_PATH, Util.intToByteArray(wnum - 1));
+                        if (wnum == 1)
+                            rmutex.release();
+                    }
+                }
+
+            }
+        } catch (Exception ex) {
+            tx.failure();
+        } finally {
+            tx.close();
+        }
+        return result;
+    }
+
+}
