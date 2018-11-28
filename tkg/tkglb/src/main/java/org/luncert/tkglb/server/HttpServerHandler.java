@@ -11,15 +11,12 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import net.sf.json.JSONObject;
 
 public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
     private static DBCluster cluster = DBCluster.getInstance();
 
-    protected void messageReceived(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
-        String query = new String(req.content().array());
-        JSONObject result = cluster.execute(query);
+    private void reply(String result) {
         HttpResponse rep;
         if (result != null) {
             ByteBuf content = Unpooled.copiedBuffer(result.toString().getBytes());
@@ -28,7 +25,12 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         else {
             rep = new DefaultFullHttpResponse(HttpVersion.HTTP_1_0, HttpResponseStatus.INTERNAL_SERVER_ERROR);
         }
-        ctx.writeAndFlush(rep);
+        // ctx.writeAndFlush(rep);
+    }
+
+    protected void messageReceived(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
+        String query = new String(req.content().array());
+        cluster.execute(query, (r) -> { this.reply(r); });
     }
 
 }

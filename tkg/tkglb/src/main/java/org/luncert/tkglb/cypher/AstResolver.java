@@ -98,6 +98,7 @@ public class AstResolver {
     public List<CPiece> resolve(ParseTree tree) {
         List<CPiece> list = new ArrayList<>();
         ParseNode root = new ParseNode(tree);
+        // 暂不支持解析standaloneCall
         ParseNode reqularQuery = root.matchPath("cypher/statement/query/regularQuery");
         list.add(resolveSingleQuery(reqularQuery.match("singleQuery")));
 
