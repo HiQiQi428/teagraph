@@ -21,7 +21,6 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.timeout.ReadTimeoutHandler;
 
 public class DBCluster {
 
@@ -72,7 +71,6 @@ public class DBCluster {
                         p.addLast(MarshallingCodeCFactory.buildMarshallingDecoder());
                         p.addLast(MarshallingCodeCFactory.buildMarshallingEncoder());
                         p.addLast(new LoggingHandler(LogLevel.INFO));
-                        p.addLast(new ReadTimeoutHandler(5));
                         p.addLast(new ServerHandler());
                     }
 

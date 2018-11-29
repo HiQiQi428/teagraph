@@ -1,6 +1,7 @@
 package org.luncert.tkgdb;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -11,7 +12,6 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.timeout.ReadTimeoutHandler;
 
 public class TKGWorker {
 
@@ -39,17 +39,11 @@ public class TKGWorker {
                         ChannelPipeline pipeline = ch.pipeline();
                         pipeline.addLast(MarshallingCodeCFactory.buildMarshallingDecoder());
                         pipeline.addLast(MarshallingCodeCFactory.buildMarshallingEncoder());
-                        pipeline.addLast(new ReadTimeoutHandler(5));
                         pipeline.addLast(new ClientHandler());
                     }
             });
-        bootstrap.connect(host, port).sync().channel();
-        wait(); // block
-    }
-
-    public static void main(String[] args) throws InterruptedException {
-        TKGWorker worker = new TKGWorker();
-        worker.start();
+        Channel channel = bootstrap.connect(host, port).sync().channel();
+        channel.closeFuture().sync();
     }
 
 }
