@@ -1,16 +1,11 @@
 package org.luncert.tkglb.cluster;
 
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 import org.luncert.tkglb.cluster.DBNode.NodeStatus;
 import org.luncert.tkglb.cluster.DBPool.ExtDBNode;
-import org.luncert.tkglb.cypher.CPiece;
 import org.luncert.tkglb.cypher.CypherAnalyser;
 import org.luncert.tkglb.cypher.CPiece.PieceType;
 
@@ -56,7 +51,7 @@ public class DBCluster {
     private DBPool dbs = new DBPool();
     private TaskQueue taskQueue = new TaskQueue();
     private ResultPool resultPool = new ResultPool();
-    private int updatingNodeNum;
+    private AtomicInteger updatingNodeNum;
 
     private EventLoopGroup bossGroup, workerGroup;
     private ChannelFuture cf;
@@ -74,6 +69,8 @@ public class DBCluster {
 
                     protected void initChannel(SocketChannel ch) throws Exception {
                         ChannelPipeline p = ch.pipeline();
+                        p.addLast(MarshallingCodeCFactory.buildMarshallingDecoder());
+                        p.addLast(MarshallingCodeCFactory.buildMarshallingEncoder());
                         p.addLast(new LoggingHandler(LogLevel.INFO));
                         p.addLast(new ReadTimeoutHandler(5));
                         p.addLast(new ServerHandler());
@@ -100,8 +97,9 @@ public class DBCluster {
         DBNode node;
         while (true) {
             if (taskQueue.size() == 0)
-                taskQueue.wait();
+                taskQueue.waitForTask();
             task = taskQueue.deQueue();
+            // reading task
             if (task.getPiece().getPieceType() == PieceType.Read) {
                 resultPool.addWaitingTask(task);
                 while ((node = dbs.getReadyDBNode()) == null) {
@@ -110,21 +108,40 @@ public class DBCluster {
                 }
                 node.execute(task); // execute后readTime自增了
             }
+            // updating task
             else {
-                ExtDBNode en;
-                updatingNodeNum = dbs.size();
+                ExtDBNode extNode;
+                updatingNodeNum.set(dbs.size());
                 Iterator<DBNode> iterator = dbs.iterator();
                 while (iterator.hasNext()) {
-                    en = (ExtDBNode)iterator.next();
-                    en.addAction(NodeStatus.Ready, (n) -> {
-                        n.execute(task);
+                    extNode = (ExtDBNode) iterator.next();
+                    extNode.addAction(NodeStatus.Ready, task, (n, t) -> {
+                        n.execute(t);
                     });
-                    en.addAction(NodeStatus.Ready, (n) -> {
-                        updatingNodeNum--;
+                    extNode.addAction(NodeStatus.Ready, null, (n, t) -> {
+                        if (updatingNodeNum.decrementAndGet() == 0)
+                            synchronized(this) {
+                                notify();
+                            }
                     });
+                }
+                synchronized(this) {
+                    wait();
                 }
             }
         }
+    }
+
+    /**
+     * 异步操作,仅添加新任务到任务队列
+     * 
+     * @param query
+     * @return 执行id,和query绑定.通过id可以从ResultPool中获取执行结果
+     * @throws Exception cypher解析异常
+     */
+    public void execute(String query, Consumer<String> callback) throws Exception {
+        int gid = taskQueue.enQueue(CypherAnalyser.analyse(query));
+        resultPool.newGroup(gid, callback);
     }
 
     /**
@@ -139,18 +156,6 @@ public class DBCluster {
         }
         bossGroup.shutdownGracefully();
         workerGroup.shutdownGracefully();
-    }
-
-    /**
-     * 异步操作,仅添加新任务到任务队列
-     * 
-     * @param query
-     * @return 执行id,和query绑定.通过id可以从ResultPool中获取执行结果
-     * @throws Exception cypher解析异常
-     */
-    public void execute(String query, Consumer<String> callback) throws Exception {
-        int gid = taskQueue.enQueue(CypherAnalyser.analyse(query));
-        resultPool.newGroup(gid, callback);
     }
 
     private static class DBClusterInner {

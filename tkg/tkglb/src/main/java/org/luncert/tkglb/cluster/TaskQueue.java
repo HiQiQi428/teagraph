@@ -33,8 +33,8 @@ public class TaskQueue {
             else // 创建第一个节点
                 head = tail = task;
             size++;
+            notify();
         }
-        this.notify();
     }
 
     public int enQueue(List<CPiece> pieces) {
@@ -58,6 +58,12 @@ public class TaskQueue {
                 head = head.next;
             size--;
             return task;
+        }
+    }
+
+    public void waitForTask() throws InterruptedException {
+        synchronized(this) {
+            wait();
         }
     }
 

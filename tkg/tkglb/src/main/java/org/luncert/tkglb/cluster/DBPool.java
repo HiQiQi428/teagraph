@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 
 import org.luncert.tkglb.cluster.DBNode.NodeStatus;
 
@@ -23,19 +23,24 @@ public class DBPool implements Iterable<DBNode> {
     /**
      * action和一个status绑定,当node状态变为status时,action被触发
      */
-    private static class Action {
+    private static class Action<E> {
         NodeStatus waitingStatus;
-        Consumer<DBNode> callback;
-        Action next;
-        Action(NodeStatus waitingStatus, Consumer<DBNode> callback) {
+        E arg;
+        BiConsumer<DBNode, E> callback;
+        Action<Object> next;
+        Action(NodeStatus waitingStatus, E arg, BiConsumer<DBNode, E> callback) {
             this.waitingStatus = waitingStatus;
+            this.arg = arg;
             this.callback = callback;
+        }
+        void execute(DBNode node) {
+            callback.accept(node, arg);
         }
     }
 
     public class ExtDBNode extends DBNode {
         DBNode node;
-        Action firstAction, lastAction;
+        Action<Object> firstAction, lastAction;
 
         private ExtDBNode(Channel channel) {
             super (channel);
@@ -48,12 +53,17 @@ public class DBPool implements Iterable<DBNode> {
             DBPool.this.percolateDown(i);
         }
 
-        public void addAction(NodeStatus status, Consumer<DBNode> callback) {
-            Action newAction = new Action(status, callback);
-            if (firstAction == null)
-                lastAction = firstAction = newAction;
-            else
-                lastAction = lastAction.next = newAction;
+        @SuppressWarnings("unchecked")
+        public <E>void addAction(NodeStatus status, E arg, BiConsumer<DBNode, E> callback) {
+            if (getStatus() == status)
+                callback.accept(this, arg);
+            else {
+                Action<Object> newAction = (Action<Object>) new Action<E>(status, arg, callback);
+                if (firstAction == null)
+                    lastAction = firstAction = newAction;
+                else
+                    lastAction = lastAction.next = newAction;
+            }
         }
 
         /**
@@ -62,7 +72,7 @@ public class DBPool implements Iterable<DBNode> {
         public void changeStatus(NodeStatus status) {
             super.changeStatus(status);
             if (firstAction != null && firstAction.waitingStatus == status) {
-                firstAction.callback.accept(this);
+                firstAction.execute(this);
                 firstAction = firstAction.next;
                 if (firstAction == null)
                     firstAction = lastAction = null;
@@ -144,12 +154,6 @@ public class DBPool implements Iterable<DBNode> {
 
     public boolean contians(Channel channel) {
         return index.containsKey(channel);
-    }
-
-    public void addAction(Channel channel, NodeStatus status, Consumer<DBNode> callback) {
-        Integer i = index.get(channel);
-        if (i != null)
-            nodes[i].addAction(status, callback);
     }
 
     private DBNode delete(int i) {
