@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.function.Consumer;
 
 import org.luncert.tkglb.cluster.DBNode.NodeStatus;
 
@@ -15,12 +16,62 @@ import io.netty.channel.Channel;
 public class DBPool implements Iterable<DBNode> {
 
     private final static int DEFAULT_OPACITY = 16;
-    private DBNode[] nodes;
+    private ExtDBNode[] nodes;
     private int size;
     Map<Channel, Integer> index = new HashMap<>();
 
+    /**
+     * action和一个status绑定,当node状态变为status时,action被触发
+     */
+    private static class Action {
+        NodeStatus waitingStatus;
+        Consumer<DBNode> callback;
+        Action next;
+        Action(NodeStatus waitingStatus, Consumer<DBNode> callback) {
+            this.waitingStatus = waitingStatus;
+            this.callback = callback;
+        }
+    }
+
+    public class ExtDBNode extends DBNode {
+        DBNode node;
+        Action firstAction, lastAction;
+
+        private ExtDBNode(Channel channel) {
+            super (channel);
+        }
+
+        public void execute(Task task) {
+            super.execute(task);
+            // node的readTime增加了,需要下滤
+            int i = index.get(node.getChannel());
+            DBPool.this.percolateDown(i);
+        }
+
+        public void addAction(NodeStatus status, Consumer<DBNode> callback) {
+            Action newAction = new Action(status, callback);
+            if (firstAction == null)
+                lastAction = firstAction = newAction;
+            else
+                lastAction = lastAction.next = newAction;
+        }
+
+        /**
+         * 状态改变,触发action
+         */
+        public void changeStatus(NodeStatus status) {
+            super.changeStatus(status);
+            if (firstAction != null && firstAction.waitingStatus == status) {
+                firstAction.callback.accept(this);
+                firstAction = firstAction.next;
+                if (firstAction == null)
+                    firstAction = lastAction = null;
+            }
+        }
+    }
+
     public DBPool() {
-        nodes = new DBNode[DEFAULT_OPACITY];
+        nodes = new ExtDBNode[DEFAULT_OPACITY];
     }
 
     /**
@@ -28,7 +79,7 @@ public class DBPool implements Iterable<DBNode> {
      */
     private void adjustCapacity() {
         if (size + 1 == nodes.length) {
-            DBNode[] tmp = new DBNode[nodes.length + nodes.length >>> 1];
+            ExtDBNode[] tmp = new ExtDBNode[nodes.length + nodes.length >>> 1];
             System.arraycopy(nodes, 0, tmp, 0, size);
             nodes = tmp;
         }
@@ -41,7 +92,7 @@ public class DBPool implements Iterable<DBNode> {
      * @return 是否进行了交换
      */
     private boolean percolatePart(int p, int c) {
-        DBNode parent = nodes[p], child = nodes[c];
+        ExtDBNode parent = nodes[p], child = nodes[c];
         if (parent.getReadTime() > child.getReadTime()) {
             nodes[p] = child;
             index.put(child.getChannel(), p);
@@ -79,7 +130,7 @@ public class DBPool implements Iterable<DBNode> {
      */
     public void newDBNode(Channel channel) {
         adjustCapacity();
-        DBNode node = new DBNode(channel);
+        ExtDBNode node = new ExtDBNode(channel);
         nodes[size] = node;
         index.put(channel, size);
         percolateUp(size);
@@ -93,6 +144,12 @@ public class DBPool implements Iterable<DBNode> {
 
     public boolean contians(Channel channel) {
         return index.containsKey(channel);
+    }
+
+    public void addAction(Channel channel, NodeStatus status, Consumer<DBNode> callback) {
+        Integer i = index.get(channel);
+        if (i != null)
+            nodes[i].addAction(status, callback);
     }
 
     private DBNode delete(int i) {
@@ -127,6 +184,10 @@ public class DBPool implements Iterable<DBNode> {
             throw new UnsupportedOperationException("operation on empty heap");
     }
 
+    public int size() {
+        return size;
+    }
+
     /**
      * 返回min节点
      * @return readTime最小的节点
@@ -136,19 +197,14 @@ public class DBPool implements Iterable<DBNode> {
         return nodes[0];
     }
 
-    /**
-     * node的readTime增加了,需要下滤
-     */
-    public void update(DBNode node) {
-        int i = index.get(node.getChannel());
-        percolateDown(i);
-    }
-
     @Override
     public Iterator<DBNode> iterator() {
         return new Itr();
     }
     
+    /**
+     * 非线程安全
+     */
     private class Itr implements Iterator<DBNode> {
 
         int cursor = 0;

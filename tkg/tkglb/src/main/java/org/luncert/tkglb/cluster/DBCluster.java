@@ -9,6 +9,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.luncert.tkglb.cluster.DBNode.NodeStatus;
+import org.luncert.tkglb.cluster.DBPool.ExtDBNode;
 import org.luncert.tkglb.cypher.CPiece;
 import org.luncert.tkglb.cypher.CypherAnalyser;
 import org.luncert.tkglb.cypher.CPiece.PieceType;
@@ -55,19 +56,17 @@ public class DBCluster {
     private DBPool dbs = new DBPool();
     private TaskQueue taskQueue = new TaskQueue();
     private ResultPool resultPool = new ResultPool();
+    private int updatingNodeNum;
+
     private EventLoopGroup bossGroup, workerGroup;
     private ChannelFuture cf;
-
-    /**
-     * 阀门,遇到写任务时置true,写任务及之前的所有任务执行完成后才为false,此前不进行任务调度
-     */
-    private boolean valve = false;
 
     private DBCluster() {}
 
     private void init() throws Exception {
         bossGroup = new NioEventLoopGroup();
         workerGroup = new NioEventLoopGroup();
+        
         ServerBootstrap bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
@@ -83,6 +82,13 @@ public class DBCluster {
                 });
         
         cf = bootstrap.bind(8899);
+        bossGroup.submit(() -> {
+            try {
+                dispatchTask();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     /**
@@ -96,21 +102,26 @@ public class DBCluster {
             if (taskQueue.size() == 0)
                 taskQueue.wait();
             task = taskQueue.deQueue();
-            resultPool.addWaitingTask(task);
             if (task.getPiece().getPieceType() == PieceType.Read) {
+                resultPool.addWaitingTask(task);
                 while ((node = dbs.getReadyDBNode()) == null) {
                     // 等待netty的有read事件发生,这时会有节点因为执行完任务进入Ready状态
                     this.wait();
                 }
-                node.execute(task);
-                dbs.update(node);
+                node.execute(task); // execute后readTime自增了
             }
             else {
-                valve = true;
+                ExtDBNode en;
+                updatingNodeNum = dbs.size();
                 Iterator<DBNode> iterator = dbs.iterator();
                 while (iterator.hasNext()) {
-                    node = iterator.next();
-                    node.execute(task);
+                    en = (ExtDBNode)iterator.next();
+                    en.addAction(NodeStatus.Ready, (n) -> {
+                        n.execute(task);
+                    });
+                    en.addAction(NodeStatus.Ready, (n) -> {
+                        updatingNodeNum--;
+                    });
                 }
             }
         }
