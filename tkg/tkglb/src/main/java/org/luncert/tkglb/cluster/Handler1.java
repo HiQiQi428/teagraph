@@ -2,40 +2,41 @@ package org.luncert.tkglb.cluster;
 
 import org.luncert.mullog.Mullog;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpResponse;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
 
 /**
- * HTTP ChannelHandler
- * 异步响应客户端数据库操作请求
+ * 用于连接数据库节点
  */
-public class Handler1 extends SimpleChannelInboundHandler<FullHttpRequest> {
+public class Handler1 extends ChannelHandlerAdapter {
 
     private static Mullog mullog = new Mullog();
-    private static Core cluster = Core.getInstance();
 
-    protected void messageReceived(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
-        String query = new String(req.content().array());
-        mullog.info("new client request: " + query);
-        // 通过回调函数,异步响应请求
-        cluster.execute(query, (result) -> {
-            HttpResponse rep;
-            if (result != null) {
-                ByteBuf content = Unpooled.copiedBuffer(result.toString().getBytes());
-                rep = new DefaultFullHttpResponse(HttpVersion.HTTP_1_0, HttpResponseStatus.OK, content);
-            }
-            else {
-                rep = new DefaultFullHttpResponse(HttpVersion.HTTP_1_0, HttpResponseStatus.INTERNAL_SERVER_ERROR);
-            }
-            ctx.writeAndFlush(rep);
-        });
+    private final DBPool dbs;
+
+    private final TaskPool taskPool;
+
+    public Handler1(DBPool pool, TaskPool taskPool) {
+        dbs = pool;
+        this.taskPool = taskPool;
+    }
+
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        DBNode node = dbs.newDBNode(ctx.channel());
+        mullog.info("new DB node connected:", node.getId());
+        ctx.fireChannelActive();
+    }
+
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        DBNode node = dbs.delete(ctx.channel());
+        mullog.info("DB node disconnected:", node.getId());
+        ctx.fireChannelInactive();
+    }
+
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        assert(msg instanceof Result);
+        taskPool.addTaskResult((Result) msg);
+        dbs.getDBNode(ctx.channel()).executeFinished();
     }
 
 }

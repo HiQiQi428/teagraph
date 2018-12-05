@@ -36,9 +36,7 @@ public class AdjacencyTable<K, V> {
 
     public int getQueueSize(K key) {
         List<V> list = map.get(key);
-        if (list != null)
-            return list.size();
-        else throw new NoSuchElementException("Invalid key: " + key);
+        return list != null ? list.size() : 0;
     }
 
     /**

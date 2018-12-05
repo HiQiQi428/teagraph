@@ -16,7 +16,7 @@ import io.netty.handler.logging.LoggingHandler;
 public class TKGWorker {
 
     private static String host = "127.0.0.1";
-    private static int port = 8899;
+    private static int port = 8898;
 
     private class ClientHandler extends SimpleChannelInboundHandler<Task> {
 

@@ -1,48 +1,36 @@
 package org.luncert.tkglb.cluster;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.concurrent.Future;
 
 public class NettyEngine {
 
     private EventLoopGroup bossGroup, workerGroup;
     private ServerBootstrap bootstrap;
+    private int port;
 
-    public NettyEngine(int port, ChannelHandler[] handlers) {
+    public NettyEngine(int port, ChannelInitializer<SocketChannel> initializer) {
+        this.port = port;
         bossGroup = new NioEventLoopGroup();
         workerGroup = new NioEventLoopGroup();
         bootstrap = new ServerBootstrap()
                 .group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
-                .childHandler(new ChannelInitializer<SocketChannel>() {
-
-                    protected void initChannel(SocketChannel ch) throws Exception {
-                        ChannelPipeline p = ch.pipeline();
-                        p.addLast(MarshallingCodeCFactory.buildMarshallingDecoder());
-                        p.addLast(MarshallingCodeCFactory.buildMarshallingEncoder());
-                        p.addLast(new LoggingHandler(LogLevel.INFO));
-                        for (ChannelHandler handler : handlers)
-                            p.addLast(handler);
-                    }
-
-                });
+                .childHandler(initializer);
     }
 
     public void run_forever() {
         try {
-            bootstrap.bind(8899).sync()
-                    .channel().closeFuture().sync();
+            ChannelFuture f = bootstrap.bind(port).sync();
+            f.channel().closeFuture().sync();
         } catch (InterruptedException e) {
-            System.out.println(e);
+            e.printStackTrace();
             clear();
         }
     }

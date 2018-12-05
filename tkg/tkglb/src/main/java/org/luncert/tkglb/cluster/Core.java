@@ -2,35 +2,69 @@ package org.luncert.tkglb.cluster;
 
 import java.util.function.Consumer;
 
+import org.luncert.mullog.Mullog;
 import org.luncert.tkglb.cypher.CypherAnalyser;
 import org.luncert.tkglb.cypher.CPiece.PieceType;
 
-import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpRequestDecoder;
+import io.netty.handler.codec.http.HttpResponseEncoder;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 
 public class Core {
+
+    private static Mullog mullog = new Mullog();
 
     private DBPool dbs = new DBPool();
     private TaskQueue taskQueue = new TaskQueue();
     private TaskPool taskPool = new TaskPool();
-    private NettyEngine nettyEngine;
+
+    /**
+     * upEngine面向DB节点,直接传输Task和Result
+     * downEngine面向客户端驱动,基于http协议
+     */
+    private NettyEngine upEngine, downEngine;
     private Task curTask;
 
     private Core() {
-        Handler1 clientHandler = new Handler1();
-        Handler2 dbHandler = new Handler2(dbs, taskPool);
-        nettyEngine = new NettyEngine(8899,
-                            new ChannelHandler[]{clientHandler, dbHandler});
-        nettyEngine.submit(() -> {
+        upEngine = new NettyEngine(8898,
+            new ChannelInitializer<SocketChannel>() {
+                protected void initChannel(SocketChannel ch) throws Exception {
+                    ChannelPipeline p = ch.pipeline();
+                    p.addLast(MarshallingCodeCFactory.buildMarshallingEncoder());
+                    p.addLast(MarshallingCodeCFactory.buildMarshallingDecoder());
+                    p.addLast(new LoggingHandler(LogLevel.INFO));
+                    p.addLast(new Handler1(dbs, taskPool));
+                }
+            });
+        upEngine.submit(() -> {
             try {
                 dispatchTask();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         });
+        downEngine = new NettyEngine(8899,
+            new ChannelInitializer<SocketChannel>() {
+                protected void initChannel(SocketChannel ch) throws Exception {
+                    ChannelPipeline p = ch.pipeline();
+                    p.addLast(new HttpResponseEncoder());
+                    p.addLast(new HttpRequestDecoder());
+                    p.addLast(new HttpObjectAggregator(10*1024*1024));
+                    p.addLast(new Handler2());
+                }
+            });
     }
 
     public void run() {
-        nettyEngine.run_forever();
+        new Thread(() -> {
+            downEngine.run_forever();
+        }).start();
+        upEngine.run_forever();
     }
 
     /**
@@ -44,11 +78,13 @@ public class Core {
             if (taskQueue.size() == 0)
                 taskQueue.waitForTask();
             task = taskQueue.deQueue();
+            mullog.info("handle task: " + task);
             taskPool.addWaitingTask(task);
             // 读任务
             if (task.getPiece().getPieceType() == PieceType.Read) {
                 taskPool.addWaitingTask(task);
                 node = dbs.getReadyDBNode();
+                mullog.info("selec DB node: " + node.getId());
                 node.execute(task);
             }
             // 写任务,写操作有返回值
