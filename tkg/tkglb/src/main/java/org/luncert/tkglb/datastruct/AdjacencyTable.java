@@ -85,7 +85,8 @@ public class AdjacencyTable<K, V> {
      */
     public void remove(K key) {
         List<V> list = map.remove(key);
-        size -= list.size();
+        if (list != null)
+            size -= list.size();
     }
 
     public void clear() {

@@ -161,7 +161,7 @@ public class DBPool implements Iterable<DBNode> {
      * @return
      */
     private String genNodeID() {
-        return genUUID(8);
+        return genUUID(12);
     }
 
     /**

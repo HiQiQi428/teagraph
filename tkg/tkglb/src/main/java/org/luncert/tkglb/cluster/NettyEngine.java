@@ -39,8 +39,10 @@ public class NettyEngine {
 
     public void run_forever() {
         try {
-            bootstrap.bind(8899).channel().close().sync();
+            bootstrap.bind(8899).sync()
+                    .channel().closeFuture().sync();
         } catch (InterruptedException e) {
+            System.out.println(e);
             clear();
         }
     }

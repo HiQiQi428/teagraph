@@ -1,5 +1,7 @@
 package org.luncert.tkglb.cluster;
 
+import org.luncert.mullog.Mullog;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
@@ -16,10 +18,12 @@ import io.netty.handler.codec.http.HttpVersion;
  */
 public class Handler1 extends SimpleChannelInboundHandler<FullHttpRequest> {
 
+    private static Mullog mullog = new Mullog();
     private static Core cluster = Core.getInstance();
 
     protected void messageReceived(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
         String query = new String(req.content().array());
+        mullog.info("new client request: " + query);
         // 通过回调函数,异步响应请求
         cluster.execute(query, (result) -> {
             HttpResponse rep;
