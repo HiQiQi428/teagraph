@@ -3,7 +3,7 @@ package org.luncert.tkglb.cluster;
 import lombok.Getter;
 
 @Getter
-public class TaskResult {
+public class Result {
 
     /**
      * 组内id

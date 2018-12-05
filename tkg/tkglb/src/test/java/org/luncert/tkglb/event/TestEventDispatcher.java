@@ -9,11 +9,8 @@ public class TestEventDispatcher {
 
     interface EventHandler {
         
-        @EventSource
-        public void peopleIn(String name);
-
-        @EventSource
-        public void peopleOut(String name);
+        Object peopleIn(String name);
+        Object peopleOut(String name);
 
     }
 
@@ -21,11 +18,12 @@ public class TestEventDispatcher {
     public void test() {
         EventDispatcher dispatcher = new EventDispatcher();
         EventHandler handler = (EventHandler) dispatcher.addEventSource(EventHandler.class);
-        dispatcher.registerListener("peopleIn", (args) -> {
-            System.out.println("people in: " + args[0]);
-            return null;
+        dispatcher.registerListener("peopleIn", (params) -> {
+            System.out.println("people in: " + params.get("name"));
+            return "test return";
         });
-        handler.peopleIn("Luncert");
+        Object ret = handler.peopleIn("Luncert");
+        System.out.println(ret);
     }
 
 }

@@ -13,6 +13,7 @@ import java.util.Map;
 public class AdjacencyTable<K, V> {
 
     Map<K, List<V>> map = new HashMap<>();
+    volatile int size;
 
     public boolean containsKey(Object key) {
         return map.containsKey(key);
@@ -44,6 +45,7 @@ public class AdjacencyTable<K, V> {
             map.put(key, list);
         }
         synchronized(list) {
+            size++;
             list.add(value);
         }
     }
@@ -58,10 +60,15 @@ public class AdjacencyTable<K, V> {
             if (list != null && !list.isEmpty()) {
                 V v = list.get(0);
                 list.remove(0);
+                size--;
                 return v;
             }
         }
         return null;
+    }
+
+    public int size() {
+        return size;
     }
 
     /**
@@ -69,7 +76,8 @@ public class AdjacencyTable<K, V> {
      * @param key
      */
     public void remove(K key) {
-        map.remove(key);
+        List<V> list = map.remove(key);
+        size -= list.size();
     }
 
     public void clear() {

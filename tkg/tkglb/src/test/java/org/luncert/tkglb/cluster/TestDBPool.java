@@ -256,27 +256,27 @@ public class TestDBPool {
     }
 
     @Test
-    public void testGetReadyDBNode() {
+    public void testGetReadyDBNode() throws InterruptedException {
         // ready -> reading
         node1.execute(newTask());
         node2.execute(newTask());
         node3.execute(newTask());
 
         // reading -> ready
-        node1.executeFinished(null);
-        node2.executeFinished(null);
-        node3.executeFinished(null);
+        node1.executeFinished();
+        node2.executeFinished();
+        node3.executeFinished();
 
         // read -> reading
         node1.execute(newTask());
         node2.execute(newTask());
 
         // reading -> ready
-        node1.executeFinished(null);
-        node2.executeFinished(null);
+        node1.executeFinished();
+        node2.executeFinished();
 
         node1.execute(newTask());
-        node1.executeFinished(null);
+        node1.executeFinished();
 
         pool.printHeap();
         System.out.println(pool.getReadyDBNode());
@@ -295,7 +295,7 @@ public class TestDBPool {
             n.execute(null);
         });
 
-        node.executeFinished(null);
+        node.executeFinished();
     }
 
     @Test
@@ -313,7 +313,7 @@ public class TestDBPool {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            node.executeFinished(null);
+            node.executeFinished();
         }).start();
 
         pool.newAction(node.getChannel(), NodeStatus.Reading, (node) -> System.out.println("node is reading")).sync();

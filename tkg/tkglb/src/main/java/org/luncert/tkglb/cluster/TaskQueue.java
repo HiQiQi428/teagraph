@@ -63,7 +63,8 @@ public class TaskQueue {
 
     public void waitForTask() throws InterruptedException {
         synchronized(this) {
-            wait();
+            if (size == 0)
+                wait();
         }
     }
 

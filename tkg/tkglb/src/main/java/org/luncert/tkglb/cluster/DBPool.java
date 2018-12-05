@@ -2,6 +2,7 @@ package org.luncert.tkglb.cluster;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -21,7 +22,7 @@ import net.sf.cglib.proxy.MethodProxy;
  * <li>{@link #index}向最小堆注册了一个监听器,监听节点索引变动,由此同步哈希索引表</li>
  * <li>{@link #actions}邻接表,存储每个DBNode接下来要执行的动作,添加action和删除action的操作可能发生在两个线程中</li>
  */
-public class DBPool {
+public class DBPool implements Iterable<DBNode> {
 
     /**
      * 使用最小堆支持选择读次数最少的可用节点的操作 {@link #getReadyDBNode()}
@@ -45,6 +46,8 @@ public class DBPool {
      */
     private AdjacencyTable<Channel, Action> actions = new AdjacencyTable<>();
 
+    private volatile boolean waitingReadyNode;
+
     /**
      * DBNode方法拦截器
      */
@@ -62,6 +65,12 @@ public class DBPool {
                 triggerAction(node);
             }
             else if (name.equals("executeFinished")) {
+                // 通知阻塞在getReadyDBNode方法的线程
+                if (waitingReadyNode) {
+                    synchronized(this) {
+                        notify();
+                    }
+                }
                 triggerAction(node);
             }
             else if (name.equals("disconnected")) {
@@ -82,6 +91,12 @@ public class DBPool {
         if (action != null && action.status.equals(node.getStatus())) {
             action.execute(node);
             actions.dequeue(channel);
+            // 所有action完成
+            if (actions.size() == 0) {
+                synchronized(this) {
+                    notify();
+                }
+            }
         }
     }
 
@@ -186,18 +201,39 @@ public class DBPool {
         return action;
     }
 
+    public void waitAllActionDone() throws InterruptedException {
+        if (this.actions.size() > 0) {
+            synchronized(this) {
+                wait();
+            }
+        }
+    }
+
     /**
-     * 遍历最小堆,返回找到的第一个可用节点
+     * <li>遍历最小堆,返回找到的第一个可用节点</li>
+     * <li>有可能此时所有节点都忙,便阻塞</li>
+     * 
      * @return DBNode
+     * @throws InterruptedException
      */
-    public DBNode getReadyDBNode() {
+    public DBNode getReadyDBNode() throws InterruptedException {
         DBNode dbNode;
         for (Node<Integer, DBNode> node : dbs) {
             dbNode = node.getValue();
             if (dbNode.getStatus() == NodeStatus.Ready)
                 return dbNode;
         }
-        return null;
+        synchronized(this) {
+            waitingReadyNode = true;
+            wait();
+            waitingReadyNode = false;
+        }
+        for (Node<Integer, DBNode> node : dbs) {
+            dbNode = node.getValue();
+            if (dbNode.getStatus() == NodeStatus.Ready)
+                return dbNode;
+        }
+        throw new RuntimeException("unexpected error");
     }
 
     public boolean contians(Channel channel) {
@@ -221,6 +257,24 @@ public class DBPool {
 
     public void printHeap() {
         System.out.println(dbs);
+    }
+
+    public Iterator<DBNode> iterator() {
+        return new Itr();
+    }
+    
+    private class Itr implements Iterator<DBNode> {
+
+        Iterator<Node<Integer, DBNode>> iterator = dbs.iterator();
+
+        public boolean hasNext() {
+            return iterator.hasNext();
+        }
+
+        public DBNode next() {
+            return iterator.next().getValue();
+        }
+
     }
 
 }

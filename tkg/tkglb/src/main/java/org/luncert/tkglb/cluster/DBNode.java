@@ -42,7 +42,7 @@ public class DBNode {
         channel.writeAndFlush(task);
     }
 
-    public void executeFinished(TaskResult result) {
+    public void executeFinished() {
         changeStatus(NodeStatus.Ready);
     }
 
