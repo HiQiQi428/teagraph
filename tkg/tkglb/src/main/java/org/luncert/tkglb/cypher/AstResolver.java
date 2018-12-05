@@ -84,15 +84,17 @@ public class AstResolver {
     }
 
     private CPiece resolveSingleQuery(ParseNode singleQuery) {
-        CPiece piece = new CPiece();
+        CPiece.CPieceBuilder builder = CPiece.builder();
         ParseNode node;
         if ((node = singleQuery.match("singlePartQuery")) == null)
             if ((node = singleQuery.match("multiPartQuery")) == null)
                 throw new AstError("resolve singleQuery failed");
         if (node.match("updatingClause") != null)
-            piece.setPieceType(PieceType.Update);
-        piece.setContent(node.getParseTree().getText());
-        return piece;
+            builder.pieceType(PieceType.Update);
+        else
+            builder.pieceType(PieceType.Read);
+        builder.content(node.getParseTree().getText());
+        return builder.build();
     }
 
     public List<CPiece> resolve(ParseTree tree) {

@@ -1,11 +1,8 @@
 package org.luncert.tkglb.cluster;
 
-import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
-import org.luncert.tkglb.cluster.DBNode.NodeStatus;
-import org.luncert.tkglb.cluster.DBPool.ExtDBNode;
 import org.luncert.tkglb.cypher.CypherAnalyser;
 import org.luncert.tkglb.cypher.CPiece.PieceType;
 
@@ -27,7 +24,7 @@ public class DBCluster {
     private class ServerHandler extends ChannelHandlerAdapter {
         
         public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
-            dbs.newDBNode(ctx.channel());
+            // dbs.newDBNode(ctx.channel());
             ctx.fireChannelRegistered();
         }
 
@@ -39,7 +36,7 @@ public class DBCluster {
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             if (msg instanceof TaskResult) {
                 resultPool.addTaskResult((TaskResult) msg);
-                dbs.getDBNode(ctx.channel()).changeStatus(NodeStatus.Ready);
+                dbs.getDBNode(ctx.channel()).executeFinished((TaskResult) msg);
             }
             else System.out.println(msg);
             ctx.fireChannelRead(msg);
@@ -108,21 +105,7 @@ public class DBCluster {
             }
             // updating task
             else {
-                ExtDBNode extNode;
                 updatingNodeNum.set(dbs.size());
-                Iterator<DBNode> iterator = dbs.iterator();
-                while (iterator.hasNext()) {
-                    extNode = (ExtDBNode) iterator.next();
-                    extNode.addAction(NodeStatus.Ready, task, (n, t) -> {
-                        n.execute(t);
-                    });
-                    extNode.addAction(NodeStatus.Ready, null, (n, t) -> {
-                        if (updatingNodeNum.decrementAndGet() == 0)
-                            synchronized(this) {
-                                notify();
-                            }
-                    });
-                }
                 synchronized(this) {
                     wait();
                 }

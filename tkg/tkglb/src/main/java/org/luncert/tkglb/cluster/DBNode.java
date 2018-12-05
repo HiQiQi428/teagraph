@@ -11,42 +11,43 @@ import lombok.Data;
 @Data
 public class DBNode {
 
-    public static enum NodeStatus {
-        Ready, Reading, Updating, Invaliable
+    private final String id;
+
+    private volatile int readTime = 0;
+
+    private volatile NodeStatus status = NodeStatus.Ready;
+
+    private final Channel channel;
+
+    public DBNode(String id, Channel channel) {
+        this.id = id;
+        this.channel = channel;
     }
 
     /**
-     * 读次数
+     * 更新节点状态
      */
-    private int readTime;
-
-    private NodeStatus status;
-
-    private Channel channel;
-
-    public DBNode(Channel channel) {
-        this.readTime = 0;
-        this.status = NodeStatus.Ready;
-        this.channel = channel;
+    private void changeStatus(NodeStatus status) {
+        this.status = status;
     }
 
     public void execute(Task task) {
         PieceType pieceType = task.getPiece().getPieceType();
-        if (pieceType == PieceType.Update) {
-            status = NodeStatus.Updating;
-        }
+        if (pieceType == PieceType.Update)
+            changeStatus(NodeStatus.Updating);
         else {
-            status = NodeStatus.Reading;
+            changeStatus(NodeStatus.Reading);
             readTime++;
         }
         channel.writeAndFlush(task);
     }
 
-    /**
-     * 设置节点状态为Ready
-     */
-    public void changeStatus(NodeStatus status) {
-        this.status = status;
+    public void executeFinished(TaskResult result) {
+        changeStatus(NodeStatus.Ready);
+    }
+
+    public void disconnected() {
+        changeStatus(NodeStatus.Invaliable);
     }
     
 }

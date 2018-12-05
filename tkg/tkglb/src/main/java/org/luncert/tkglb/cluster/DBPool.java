@@ -1,228 +1,226 @@
 package org.luncert.tkglb.cluster;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.function.BiConsumer;
+import java.util.UUID;
+import java.util.function.Consumer;
 
-import org.luncert.tkglb.cluster.DBNode.NodeStatus;
+import org.luncert.tkglb.datastruct.AdjacencyTable;
+import org.luncert.tkglb.datastruct.BiHeap;
+import org.luncert.tkglb.datastruct.BiHeap.Node;
 
 import io.netty.channel.Channel;
+import net.sf.cglib.proxy.Enhancer;
+import net.sf.cglib.proxy.MethodInterceptor;
+import net.sf.cglib.proxy.MethodProxy;
 
 /**
- * 最小堆存储DBNode
+ * <li>{@link #methodInterceptor}动态代理DBNode,监听execute和executeFinished方法被调用导致的状态改变
+ * ,以及readTime增加需要更新最小堆</li>
+ * <li>{@link #index}向最小堆注册了一个监听器,监听节点索引变动,由此同步哈希索引表</li>
+ * <li>{@link #actions}邻接表,存储每个DBNode接下来要执行的动作,添加action和删除action的操作可能发生在两个线程中</li>
  */
-public class DBPool implements Iterable<DBNode> {
-
-    private final static int DEFAULT_OPACITY = 16;
-    private ExtDBNode[] nodes;
-    private int size;
-    Map<Channel, Integer> index = new HashMap<>();
+public class DBPool {
 
     /**
-     * action和一个status绑定,当node状态变为status时,action被触发
+     * 使用最小堆支持选择读次数最少的可用节点的操作 {@link #getReadyDBNode()}
+     * 存在一个问题,最小堆同胞节点不是有序的,而取可用节点的操作会先查看左孩子,再查看右孩子,所以可能返回的不是readTime最小的节点
      */
-    private static class Action<E> {
-        NodeStatus waitingStatus;
-        E arg;
-        BiConsumer<DBNode, E> callback;
-        Action<Object> next;
-        Action(NodeStatus waitingStatus, E arg, BiConsumer<DBNode, E> callback) {
-            this.waitingStatus = waitingStatus;
-            this.arg = arg;
-            this.callback = callback;
-        }
-        void execute(DBNode node) {
-            callback.accept(node, arg);
+    private BiHeap<Integer, DBNode> dbs = new BiHeap<>(true,
+        (a, b) -> (a > b ? 1 : (a < b ? -1 : 0)));
+    
+    /**
+     * 索引表,映射channel到其绑定的DBNode在最小堆中的位置
+     */
+    private Map<Channel, Integer> index = new HashMap<>();
+
+    /**
+     * DBNode方法拦截器
+     */
+    private MethodInterceptor methodInterceptor = new DBNMethodInterceptor();
+
+    /**
+     * actions邻接表,每个channel绑定一个链表,链表中顺序存放接下来DBNode要执行的操作
+     */
+    private AdjacencyTable<Channel, Action> actions = new AdjacencyTable<>();
+
+    /**
+     * DBNode方法拦截器
+     */
+    private class DBNMethodInterceptor implements MethodInterceptor {
+
+        @Override
+        public Object intercept(Object obj, Method method, Object[] args, MethodProxy proxy) throws Throwable {
+            String name = method.getName();
+            DBNode node = (DBNode) obj;
+            Object object = proxy.invokeSuper(obj, args);
+            // 拦截execute,executeFinished,disconnected调用
+            if (name.equals("execute")) {
+                Integer i = index.get(node.getChannel());
+                dbs.update(i, node.getReadTime());
+                triggerAction(node);
+            }
+            else if (name.equals("executeFinished")) {
+                triggerAction(node);
+            }
+            else if (name.equals("disconnected")) {
+                delete(node.getChannel());
+            }
+            return object;
+		}
+
+    }
+
+    /**
+     * 触发action
+     * @param node
+     */
+    private void triggerAction(DBNode node) {
+        Channel channel = node.getChannel();
+        Action action = actions.get(channel);
+        if (action != null && action.status.equals(node.getStatus())) {
+            action.execute(node);
+            actions.dequeue(channel);
         }
     }
 
-    public class ExtDBNode extends DBNode {
-        DBNode node;
-        Action<Object> firstAction, lastAction;
+    /**
+     * 当监听的节点状态转变为期待的状态时,执行回调
+     */
+    public static class Action {
+        private final NodeStatus status;
+        private final Consumer<DBNode> callback;
 
-        private ExtDBNode(Channel channel) {
-            super (channel);
+        Action(NodeStatus status, Consumer<DBNode> callback) {
+            this.status = status;
+            this.callback = callback;
         }
 
-        public void execute(Task task) {
-            super.execute(task);
-            // node的readTime增加了,需要下滤
-            int i = index.get(node.getChannel());
-            DBPool.this.percolateDown(i);
-        }
-
-        @SuppressWarnings("unchecked")
-        public <E>void addAction(NodeStatus status, E arg, BiConsumer<DBNode, E> callback) {
-            if (getStatus() == status)
-                callback.accept(this, arg);
-            else {
-                Action<Object> newAction = (Action<Object>) new Action<E>(status, arg, callback);
-                if (firstAction == null)
-                    lastAction = firstAction = newAction;
-                else
-                    lastAction = lastAction.next = newAction;
+        /**
+         * 执行回调,通知其他调用了{@link #sync()}的线程
+         * @param node
+         */
+        private void execute(DBNode node) {
+            callback.accept(node);
+            synchronized(this) {
+                notify();
             }
         }
 
         /**
-         * 状态改变,触发action
+         * 同步,等待action被执行
          */
-        public void changeStatus(NodeStatus status) {
-            super.changeStatus(status);
-            if (firstAction != null && firstAction.waitingStatus == status) {
-                firstAction.execute(this);
-                firstAction = firstAction.next;
-                if (firstAction == null)
-                    firstAction = lastAction = null;
+        public void sync() {
+            synchronized(this) {
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
 
     public DBPool() {
-        nodes = new ExtDBNode[DEFAULT_OPACITY];
+        dbs.registerListener((newIndex, node) -> 
+            index.put(node.getChannel(), newIndex));
     }
 
-    /**
-     * 调整堆数组容量
-     */
-    private void adjustCapacity() {
-        if (size + 1 == nodes.length) {
-            ExtDBNode[] tmp = new ExtDBNode[nodes.length + nodes.length >>> 1];
-            System.arraycopy(nodes, 0, tmp, 0, size);
-            nodes = tmp;
+    private String genUUID(int n) {
+        String ret = "";
+        int loopTime = n / 32 + ((n % 32 == 0) ? 0 : 1);
+        for (int i = 0, rest = n;; i++, rest -= 32) {
+            if (i < loopTime - 1)
+                ret += UUID.randomUUID().toString().trim().replaceAll("-", "");
+            else {
+                ret += UUID.randomUUID().toString().trim().replaceAll("-", "").substring(0, rest);
+                break;
+            }
         }
+        return ret;
     }
 
     /**
-     * 比较父子节点,通过交换使堆符合最小堆性质
-     * @param p 父亲节点索引
-     * @param c 子节点索引
-     * @return 是否进行了交换
+     * 生成node ID
+     * @return
      */
-    private boolean percolatePart(int p, int c) {
-        ExtDBNode parent = nodes[p], child = nodes[c];
-        if (parent.getReadTime() > child.getReadTime()) {
-            nodes[p] = child;
-            index.put(child.getChannel(), p);
-            nodes[c] = parent;
-            index.put(parent.getChannel(), c);
-            return true;
-        }
-        return false;
+    private String genNodeID() {
+        return genUUID(8);
     }
 
     /**
-     * @param i 需要下滤的节点的索引
+     * 创建与channel绑定的DBNode
+     * @param channel
+     * @return DBNode
      */
-    private void percolateDown(int i) {
-        int leftChild = i * 2 + 1, rightChild = leftChild + 1;
-        if (leftChild < size && percolatePart(i, leftChild))
-            percolateDown(leftChild);
-        if (rightChild < size && percolatePart(i, rightChild))
-            percolateDown(rightChild);
+    public DBNode newDBNode(Channel channel) {
+        Enhancer enhancer = new Enhancer();
+        enhancer.setSuperclass(DBNode.class);
+        enhancer.setCallback(methodInterceptor);
+        DBNode node = (DBNode) enhancer.create(new Class[]{String.class, Channel.class}, new Object[]{genNodeID(), channel});
+        dbs.insert(node.getReadTime(), node);
+        return node;
     }
 
     /**
-     * @param i 需要上滤的节点的索引
+     * 根据channel获取DBNode,首先根据channel从索引表获取索引,在用索引从最小堆中获取DBNode
+     * @param channel
+     * @return DBNode
      */
-    private void percolateUp(int i) {
-        int parent = (i - 1) / 2;
-        while (i > 0 && percolatePart(parent, i)) {
-            i = parent;
-            parent = (i - 2) / 2;
-        }
-    }
-
-    /**
-     * 创建新节点绑定channel,将新节点添加到堆数组末尾,然后执行上滤
-     */
-    public void newDBNode(Channel channel) {
-        adjustCapacity();
-        ExtDBNode node = new ExtDBNode(channel);
-        nodes[size] = node;
-        index.put(channel, size);
-        percolateUp(size);
-        size++;
-    }
-
     public DBNode getDBNode(Channel channel) {
         Integer i = index.get(channel);
-        return (i != null) ? nodes[i] : null;
+        return (i != null) ? dbs.get(i) : null;
+    }
+
+    /**
+     * 为指定DBNode创建action
+     * @param channel 节点channel
+     * @param status 出发action的节点状态
+     * @param callback 回调,实际操作
+     * @return Action, 用于调用sync进行同步
+     */
+    public Action newAction(Channel channel, NodeStatus status, Consumer<DBNode> callback) {
+        Action action = new Action(status, callback);
+        actions.enqueue(channel, action);
+        return action;
+    }
+
+    /**
+     * 遍历最小堆,返回找到的第一个可用节点
+     * @return DBNode
+     */
+    public DBNode getReadyDBNode() {
+        DBNode dbNode;
+        for (Node<Integer, DBNode> node : dbs) {
+            dbNode = node.getValue();
+            if (dbNode.getStatus() == NodeStatus.Ready)
+                return dbNode;
+        }
+        return null;
     }
 
     public boolean contians(Channel channel) {
         return index.containsKey(channel);
     }
 
-    private DBNode delete(int i) {
-        DBNode node = nodes[i];
-        nodes[i] = nodes[--size];
-        nodes[size] = null;
-        percolateDown(i);
-        return node;
+    public int size() {
+        return dbs.size();
     }
 
     public DBNode delete(Channel channel) {
         Integer i = index.get(channel);
-        DBNode node = null;
         if (i != null) {
-            node = delete(i);
+            DBNode node = dbs.delete(i);
             index.remove(channel);
+            actions.remove(channel);
+            return node;
         }
-        return node;
+        return null;
     }
 
-    public DBNode getReadyDBNode() {
-        DBNode node = null;
-        for (int i = 0; i < size; i++) {
-            if ((node = nodes[i]).getStatus() == NodeStatus.Ready)
-                return node;
-        }
-        return node;
-    }
-
-    private void sizeCheck() {
-        if (size == 0)
-            throw new UnsupportedOperationException("operation on empty heap");
-    }
-
-    public int size() {
-        return size;
-    }
-
-    /**
-     * 返回min节点
-     * @return readTime最小的节点
-     */
-    public DBNode getMin() {
-        sizeCheck();
-        return nodes[0];
-    }
-
-    @Override
-    public Iterator<DBNode> iterator() {
-        return new Itr();
-    }
-    
-    /**
-     * 非线程安全
-     */
-    private class Itr implements Iterator<DBNode> {
-
-        int cursor = 0;
-
-        public boolean hasNext() {
-            return cursor < size;
-        }
-
-        public DBNode next() {
-            if (cursor == size)
-                throw new NoSuchElementException("index: " + cursor);
-            return nodes[cursor++];
-        }
-
+    public void printHeap() {
+        System.out.println(dbs);
     }
 
 }
