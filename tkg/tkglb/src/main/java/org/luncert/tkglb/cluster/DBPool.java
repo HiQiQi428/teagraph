@@ -92,11 +92,11 @@ public class DBPool implements Iterable<DBNode> {
             action.execute(node);
             actions.dequeue(channel);
             // 所有action完成
-            if (actions.size() == 0) {
-                synchronized(this) {
-                    notify();
-                }
-            }
+            // if (actions.size() == 0) {
+            //     synchronized(this) {
+            //         notify();
+            //     }
+            // }
         }
     }
 
@@ -189,7 +189,7 @@ public class DBPool implements Iterable<DBNode> {
     }
 
     /**
-     * 为指定DBNode创建action
+     * 为指定DBNode创建action,会影响到{@link #getReadyDBNode()}
      * @param channel 节点channel
      * @param status 出发action的节点状态
      * @param callback 回调,实际操作
@@ -201,39 +201,52 @@ public class DBPool implements Iterable<DBNode> {
         return action;
     }
 
-    public void waitAllActionDone() throws InterruptedException {
-        if (this.actions.size() > 0) {
-            synchronized(this) {
-                wait();
+    /**
+     * 等待所有排队的操作被执行完
+     * @throws InterruptedException
+     */
+    // public void waitAllActionDone() throws InterruptedException {
+    //     if (this.actions.size() > 0) {
+    //         synchronized(this) {
+    //             wait();
+    //         }
+    //     }
+    // }
+
+    private DBNode getReadyDBNodeNonBlock() {
+        DBNode dbNode;
+        for (Node<Integer, DBNode> node : dbs) {
+            dbNode = node.getValue();
+            if (dbNode.getStatus() == NodeStatus.Ready
+                && actions.getQueueSize(dbNode.getChannel()) == 0)
+            {
+                return dbNode;
             }
         }
+        return null;
     }
 
     /**
-     * <li>遍历最小堆,返回找到的第一个可用节点</li>
-     * <li>有可能此时所有节点都忙,便阻塞</li>
+     * <li>遍历最小堆,返回找到的第一个可用节点,如果没有便阻塞当前线程</li>
+     * <li>可用:状态为Ready且action队列为空{@link #getReadyDBNodeNonBlock()}</li>
+     * <li>(有点不合理,action队列应该是可以不为空的)</li>
      * 
      * @return DBNode
      * @throws InterruptedException
      */
     public DBNode getReadyDBNode() throws InterruptedException {
-        DBNode dbNode;
-        for (Node<Integer, DBNode> node : dbs) {
-            dbNode = node.getValue();
-            if (dbNode.getStatus() == NodeStatus.Ready)
-                return dbNode;
+        DBNode dbNode = getReadyDBNodeNonBlock();
+        if (dbNode == null) {
+            synchronized(this) {
+                waitingReadyNode = true;
+                wait();
+                waitingReadyNode = false;
+            }
+            dbNode = getReadyDBNodeNonBlock();
+            if (dbNode == null)
+                throw new RuntimeException("unexpected error");
         }
-        synchronized(this) {
-            waitingReadyNode = true;
-            wait();
-            waitingReadyNode = false;
-        }
-        for (Node<Integer, DBNode> node : dbs) {
-            dbNode = node.getValue();
-            if (dbNode.getStatus() == NodeStatus.Ready)
-                return dbNode;
-        }
-        throw new RuntimeException("unexpected error");
+        return dbNode;
     }
 
     public boolean contians(Channel channel) {

@@ -8,8 +8,15 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+/**
+ * ok
+ */
 public class TaskPool {
 
+    /**
+     * <li>任务组,因为添加task和添加result的操作都各自发生在单个线程中,不需要同步</li>
+     * <li>添加task发生在调度线程中,添加result发生在netty工作线程中,netty有多个工作线程</li>
+     */
     private static class Group {
 
         private List<Task> tasks = new ArrayList<>();
@@ -25,7 +32,9 @@ public class TaskPool {
         }
 
         void addTaskResult(Result result) {
-            results.add(result);
+            synchronized(results) {
+                results.add(result);
+            }
         }
 
         boolean executeFinished() {
@@ -88,11 +97,14 @@ public class TaskPool {
     public void addTaskResult(Result result) {
         int gid = result.getGroupId();
         Group g = getGroup(gid);
-        g.addTaskResult(result);
-        if (g.executeFinished()) {
-            g.callback.accept(g.reduce());
-            groups.remove(gid);
+        if (g != null) {
+            g.addTaskResult(result);
+            if (g.executeFinished()) {
+                g.callback.accept(g.reduce());
+                groups.remove(gid);
+            }
         }
+        // 如果g为null且result为写任务结果则是正常的.
+        // 当写任务为任务组最后一个时,由于写任务会被所有节点执行,而只要有一个执行结果返回便会删除任务组(执行完了)
     }
-
 }

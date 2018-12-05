@@ -44,20 +44,19 @@ public class Core {
             if (taskQueue.size() == 0)
                 taskQueue.waitForTask();
             task = taskQueue.deQueue();
+            taskPool.addWaitingTask(task);
             // 读任务
             if (task.getPiece().getPieceType() == PieceType.Read) {
                 taskPool.addWaitingTask(task);
                 node = dbs.getReadyDBNode();
                 node.execute(task);
             }
-            // 写任务
+            // 写任务,写操作有返回值
             else {
                 curTask = task;
                 for (DBNode tmp : dbs) {
                     if (!tmp.getStatus().equals(NodeStatus.Ready)) {
                         // 先等待节点ready,然后执行写任务
-                        // 这里会添加很多个相同的写任务到任务组中!
-                        taskPool.addWaitingTask(task);
                         dbs.newAction(tmp.getChannel(), NodeStatus.Ready, (n) -> n.execute(curTask));
                     }
                     else {
@@ -66,8 +65,6 @@ public class Core {
                     // 再等待写任务执行完
                     dbs.newAction(tmp.getChannel(), NodeStatus.Ready, (n) -> {});
                 }
-                // 等待所有动作完成
-                dbs.waitAllActionDone();
             }
         }
     }

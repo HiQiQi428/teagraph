@@ -1,11 +1,15 @@
 package org.luncert.tkglb.cluster;
 
+import java.security.InvalidParameterException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 import org.luncert.tkglb.cypher.CPiece;
 
+/**
+ * ok
+ */
 public class TaskQueue {
 
     private static class TaskNode extends Task {
@@ -26,24 +30,29 @@ public class TaskQueue {
 
     public boolean isEmpty() { return size == 0; }
 
-    private void enQueue(TaskNode task) {
-        synchronized (this) {
-            if (head != null)
-                tail = tail.next = task;
-            else // 创建第一个节点
-                head = tail = task;
-            size++;
-            notify();
-        }
-    }
-
+    /**
+     * 添加为CPiece数组创建任务组
+     * @param pieces
+     * @return 组ID
+     */
     public int enQueue(List<CPiece> pieces) {
         TaskNode task;
-        for (int i = 0, limit = pieces.size(); i < limit; i++) {
-            task = new TaskNode(i, gidCount, pieces.get(i));
-            enQueue(task);
+        int limit = pieces.size();
+        if (limit > 0) {
+            synchronized(this) {
+                for (int i = 0; i < limit; i++) {
+                    task = new TaskNode(i, gidCount, pieces.get(i));
+                    if (head != null)
+                        tail = tail.next = task;
+                    else // 创建第一个节点
+                        head = tail = task;
+                    size++;
+                }
+                notify();
+                return gidCount++;
+            }
         }
-        return gidCount++;
+        throw new InvalidParameterException("empty list");
     }
 
     public Task deQueue() {
@@ -83,7 +92,7 @@ public class TaskQueue {
     }
 
     /**
-     * 迭代取出所有元素
+     * 迭代取出所有元素,如果在迭代期间队列有增删操作,可能会出错
      */
     public Iterator<Task> iterator() { return new Itr(); }
     

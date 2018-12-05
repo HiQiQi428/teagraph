@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 /**
  * HashMap实现的邻接表,用链表实现队列作为键值,相同键名不同键值不会放在同一个槽中,而是放入同一个队列的不同位置,做了一定程度的同步
@@ -15,7 +16,7 @@ public class AdjacencyTable<K, V> {
     Map<K, List<V>> map = new HashMap<>();
     volatile int size;
 
-    public boolean containsKey(Object key) {
+    public boolean containsKey(K key) {
         return map.containsKey(key);
     }
 
@@ -23,7 +24,7 @@ public class AdjacencyTable<K, V> {
      * @param key
      * @return key对应的队列头元素
      */
-    public V get(Object key) {
+    public V get(K key) {
         List<V> list = map.get(key);
         synchronized(list) {
             if (list != null && !list.isEmpty()) {
@@ -31,6 +32,13 @@ public class AdjacencyTable<K, V> {
             }
         }
         return null;
+    }
+
+    public int getQueueSize(K key) {
+        List<V> list = map.get(key);
+        if (list != null)
+            return list.size();
+        else throw new NoSuchElementException("Invalid key: " + key);
     }
 
     /**
