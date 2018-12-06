@@ -5,11 +5,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+import org.luncert.tkglb.cluster.bean.Task;
 import org.luncert.tkglb.cypher.CPiece;
+import org.springframework.stereotype.Component;
 
 /**
  * ok
  */
+@Component
 public class TaskQueue {
 
     private static class TaskNode extends Task {

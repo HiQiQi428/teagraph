@@ -1,4 +1,4 @@
-package org.luncert.tkglb.cluster;
+package org.luncert.tkglb.cluster.bean;
 
 /**
  * Ready -> Reading

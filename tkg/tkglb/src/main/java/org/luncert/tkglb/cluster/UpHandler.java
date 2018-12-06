@@ -1,6 +1,8 @@
 package org.luncert.tkglb.cluster;
 
-import org.luncert.mullog.Mullog;
+import org.luncert.tkglb.cluster.bean.Result;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
@@ -8,28 +10,22 @@ import io.netty.channel.ChannelHandlerContext;
 /**
  * 用于连接数据库节点
  */
-public class Handler1 extends ChannelHandlerAdapter {
+@Component
+public class UpHandler extends ChannelHandlerAdapter {
 
-    private static Mullog mullog = new Mullog();
+    @Autowired
+    private DBPool dbs;
 
-    private final DBPool dbs;
-
-    private final TaskPool taskPool;
-
-    public Handler1(DBPool pool, TaskPool taskPool) {
-        dbs = pool;
-        this.taskPool = taskPool;
-    }
+    @Autowired
+    private TaskPool taskPool;
 
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        DBNode node = dbs.newDBNode(ctx.channel());
-        mullog.info("new DB node connected:", node.getId());
+        dbs.newDBNode(ctx.channel());
         ctx.fireChannelActive();
     }
 
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        DBNode node = dbs.delete(ctx.channel());
-        mullog.info("DB node disconnected:", node.getId());
+        dbs.delete(ctx.channel());
         ctx.fireChannelInactive();
     }
 

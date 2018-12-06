@@ -7,9 +7,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+import org.luncert.tkglb.cluster.bean.DBNode;
+import org.luncert.tkglb.cluster.bean.NodeStatus;
 import org.luncert.tkglb.datastruct.AdjacencyTable;
 import org.luncert.tkglb.datastruct.BiHeap;
 import org.luncert.tkglb.datastruct.BiHeap.Node;
+import org.springframework.stereotype.Component;
 
 import io.netty.channel.Channel;
 import net.sf.cglib.proxy.Enhancer;
@@ -22,6 +25,7 @@ import net.sf.cglib.proxy.MethodProxy;
  * <li>{@link #index}向最小堆注册了一个监听器,监听节点索引变动,由此同步哈希索引表</li>
  * <li>{@link #actions}邻接表,存储每个DBNode接下来要执行的动作,添加action和删除action的操作可能发生在两个线程中</li>
  */
+@Component
 public class DBPool implements Iterable<DBNode> {
 
     /**

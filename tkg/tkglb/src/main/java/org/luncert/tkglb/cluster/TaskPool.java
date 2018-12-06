@@ -8,9 +8,14 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+import org.luncert.tkglb.cluster.bean.Result;
+import org.luncert.tkglb.cluster.bean.Task;
+import org.springframework.stereotype.Component;
+
 /**
  * ok
  */
+@Component
 public class TaskPool {
 
     /**

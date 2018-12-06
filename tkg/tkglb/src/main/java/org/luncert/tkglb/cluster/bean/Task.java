@@ -1,4 +1,4 @@
-package org.luncert.tkglb.cluster;
+package org.luncert.tkglb.cluster.bean;
 
 import org.luncert.tkglb.cypher.CPiece;
 

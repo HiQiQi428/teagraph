@@ -1,6 +1,7 @@
 package org.luncert.tkglb.cluster;
 
-import org.luncert.mullog.Mullog;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -17,17 +18,17 @@ import io.netty.util.CharsetUtil;
  * HTTP ChannelHandler
  * 异步响应客户端数据库操作请求
  */
-public class Handler2 extends SimpleChannelInboundHandler<FullHttpRequest> {
+@Component
+public class DownHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
-    private static Mullog mullog = new Mullog();
-    private static Core cluster = Core.getInstance();
+    @Autowired
+    private Processor processor;
 
     @Override
     protected void messageReceived(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
         String query = req.content().toString(CharsetUtil.UTF_8);
-        mullog.info("new client query: " + query);
         // 通过回调函数,异步响应请求
-        cluster.execute(query, (result) -> {
+        processor.execute(query, (result) -> {
             HttpResponse rep;
             if (result != null) {
                 ByteBuf content = Unpooled.copiedBuffer(result.toString().getBytes());
