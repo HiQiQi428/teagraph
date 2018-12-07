@@ -6,6 +6,9 @@ import org.luncert.mullog.Mullog;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+/**
+ * Core日志输出
+ */
 @Aspect
 @Component
 public class CoreAspect {
@@ -15,7 +18,7 @@ public class CoreAspect {
 
     @Before("execution(public * org.luncert.tkglb.Core.run())")
     public void beforeRun() {
-        mullog.info("TKGLB started");
+        mullog.info("Core:", "TKGLB started");
     }
     
 }

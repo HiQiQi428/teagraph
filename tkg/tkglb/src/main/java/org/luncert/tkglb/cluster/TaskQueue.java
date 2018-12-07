@@ -10,7 +10,7 @@ import org.luncert.tkglb.cypher.CPiece;
 import org.springframework.stereotype.Component;
 
 /**
- * ok
+ * 任务队列
  */
 @Component
 public class TaskQueue {
@@ -21,6 +21,11 @@ public class TaskQueue {
 
         TaskNode(int taskId, int groupId, CPiece piece) {
             super(taskId, groupId, piece);
+        }
+
+        @Override
+        public String toString() {
+            return super.toString();
         }
 
     }

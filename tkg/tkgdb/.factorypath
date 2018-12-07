@@ -1,4 +1,5 @@
 <factorypath>
+    <factorypathentry kind="VARJAR" id="M2_REPO/io/netty/netty-all/5.0.0.Alpha2/netty-all-5.0.0.Alpha2.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/org/neo4j/neo4j/3.5.0-alpha06/neo4j-3.5.0-alpha06.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/org/neo4j/neo4j-kernel/3.5.0-alpha06/neo4j-kernel-3.5.0-alpha06.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/org/neo4j/neo4j-graphdb-api/3.5.0-alpha06/neo4j-graphdb-api-3.5.0-alpha06.jar" enabled="true" runInBatchMode="false"/>
@@ -97,7 +98,6 @@
     <factorypathentry kind="VARJAR" id="M2_REPO/io/netty/netty/3.10.5.Final/netty-3.10.5.Final.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/com/google/guava/guava/20.0/guava-20.0.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/org/slf4j/slf4j-api/1.7.6/slf4j-api-1.7.6.jar" enabled="true" runInBatchMode="false"/>
-    <factorypathentry kind="VARJAR" id="M2_REPO/io/netty/netty-all/5.0.0.Alpha2/netty-all-5.0.0.Alpha2.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/org/jboss/marshalling/jboss-marshalling-serial/2.0.6.Final/jboss-marshalling-serial-2.0.6.Final.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/org/jboss/marshalling/jboss-marshalling/2.0.6.Final/jboss-marshalling-2.0.6.Final.jar" enabled="true" runInBatchMode="false"/>
     <factorypathentry kind="VARJAR" id="M2_REPO/org/projectlombok/lombok/1.16.20/lombok-1.16.20.jar" enabled="true" runInBatchMode="false"/>

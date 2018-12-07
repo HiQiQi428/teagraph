@@ -264,6 +264,9 @@ public class BiHeap<K, V> implements Iterable<BiHeap.Node<K, V>> {
             else data[i] = adt.deleteMax();
     }
     
+    /**
+     * 返回一个非线程安全的迭代器
+     */
     @Override
     public Iterator<Node<K, V>> iterator() {
         return new Itr();

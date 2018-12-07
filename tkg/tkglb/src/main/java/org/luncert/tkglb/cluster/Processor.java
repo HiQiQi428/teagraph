@@ -1,7 +1,9 @@
 package org.luncert.tkglb.cluster;
 
+import java.util.List;
 import java.util.function.Consumer;
 
+import org.luncert.tkglb.cypher.CPiece;
 import org.luncert.tkglb.cypher.CypherAnalyser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -16,7 +18,7 @@ public class Processor {
     private TaskQueue taskQueue;
 
     @Autowired
-    private TaskPool taskPool;
+    private ResultPool resultPool;
 
     /**
      * 异步操作,仅添加新任务到任务队列
@@ -26,8 +28,9 @@ public class Processor {
      * @throws Exception cypher解析异常
      */
     public void execute(String query, Consumer<String> callback) throws Exception {
-        int gid = taskQueue.enQueue(CypherAnalyser.analyse(query));
-        taskPool.newGroup(gid, callback);
+        List<CPiece> pieces = CypherAnalyser.analyse(query);
+        int gid = taskQueue.enQueue(pieces);
+        resultPool.newGroup(gid, pieces.size(), callback);
     }
 
 }

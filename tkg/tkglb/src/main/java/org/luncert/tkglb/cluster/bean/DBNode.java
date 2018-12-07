@@ -19,8 +19,8 @@ public class DBNode {
 
     private final Channel channel;
 
-    public DBNode(String id, Channel channel) {
-        this.id = id;
+    public DBNode(Channel channel) {
+        this.id = channel.id().asLongText();
         this.channel = channel;
     }
 
@@ -39,7 +39,7 @@ public class DBNode {
             changeStatus(NodeStatus.Reading);
             readTime++;
         }
-        channel.writeAndFlush(task);
+        channel.writeAndFlush(task.toPropsString());
     }
 
     public void executeFinished() {

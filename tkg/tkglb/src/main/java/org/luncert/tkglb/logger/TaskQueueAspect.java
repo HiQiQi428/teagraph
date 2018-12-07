@@ -1,7 +1,5 @@
 package org.luncert.tkglb.logger;
 
-import java.util.List;
-
 import org.aspectj.lang.annotation.After;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
@@ -12,6 +10,9 @@ import org.luncert.tkglb.cluster.bean.Task;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+/**
+ * TaskQueue日志输出
+ */
 @Aspect
 @Component
 public class TaskQueueAspect {
@@ -19,28 +20,14 @@ public class TaskQueueAspect {
     @Autowired
     private Mullog mullog;
 
-    private int taskNum;
-    
-    // enQueue
-
-    @Pointcut("execution(public * org.luncert.tkglb.cluster.TaskQueue.enQueue(..))")
-    public void enQueue(){}
-
-    @Before("enQueue() && args(pieces)")
-    public void beforeEnQueue(List<?> pieces) {
-        taskNum = pieces.size();
-    }
-
-    @AfterReturning(pointcut = "enQueue()", returning = "gid")
-    public void afterReturningEnQueue(int gid) {
-        mullog.info("new task group(gid = " + gid + ", taskNum = " + taskNum);
-    }
-
     // deQueue
 
+    /**
+     * TaskDispatcher调用deQueue从任务队列获取任务
+     */
     @AfterReturning(pointcut = "execution(public * org.luncert.tkglb.cluster.TaskQueue.deQueue())", returning = "task")
     public void afterReturningDeQueue(Task task) {
-        mullog.info("starting to process task: " + task);
+        mullog.info("TaskDispatcher:", "starting to process " + task);
     }
 
     // waitForTask
@@ -50,12 +37,12 @@ public class TaskQueueAspect {
 
     @Before("waitForTask()")
     public void beforeWaitForTask() {
-        mullog.info("waiting for new task");
+        mullog.info("TaskDispatcher:", "waiting for new task");
     }
 
     @After("waitForTask()")
     public void afterWaitForTask() {
-        mullog.info("new task arrived");
+        mullog.info("TaskDispatcher:", "new task arrived");
     }
 
 }

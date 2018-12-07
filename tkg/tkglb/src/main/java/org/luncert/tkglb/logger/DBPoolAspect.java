@@ -7,6 +7,9 @@ import org.luncert.tkglb.cluster.bean.DBNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+/**
+ * DBPool日志输出
+ */
 @Aspect
 @Component
 public class DBPoolAspect {
@@ -16,17 +19,17 @@ public class DBPoolAspect {
 
     @AfterReturning(pointcut = "execution(public * org.luncert.tkglb.cluster.DBPool.newDBNode(..))", returning = "dbNode")
     public void newDBNode(DBNode dbNode) {
-        mullog.info("new DB node connected: " + dbNode);
+        mullog.info("new DB node connected -> " + dbNode);
     }
 
     @AfterReturning(pointcut = "execution(public * org.luncert.tkglb.cluster.DBPool.getReadyDBNode(..))", returning = "dbNode")
     public void getReadyDBNode(DBNode dbNode) {
-        mullog.info("selected db node: " + dbNode);
+        mullog.info("TaskDispatcher:", "selected db node(id = " + dbNode.getId() + ")");
     }
 
     @AfterReturning(pointcut = "execution(public * org.luncert.tkglb.cluster.DBPool.delete(..))", returning = "dbNode")
     public void delete(DBNode dbNode) {
-        mullog.info("DB node disconnected: " + dbNode);
+        mullog.info("DB node disconnected -> " + dbNode);
     }
 
 

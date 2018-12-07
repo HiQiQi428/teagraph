@@ -9,7 +9,7 @@ public class Config {
 
     @Bean
     public Mullog mullog() {
-        return new Mullog();
+        return new Mullog("console"); // Mullog需要优化
     }
 
 }

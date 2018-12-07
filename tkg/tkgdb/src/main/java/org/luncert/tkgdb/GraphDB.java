@@ -22,7 +22,7 @@ public class GraphDB {
             .setConfig(GraphDatabaseSettings.pagecache_memory, "512M")
             .setConfig(GraphDatabaseSettings.string_block_size, "60")
             .setConfig(GraphDatabaseSettings.array_block_size, "300")
-                .setConfig(GraphDatabaseSettings.bolt_ssl_policy, "true").newGraphDatabase();
+            .setConfig(GraphDatabaseSettings.bolt_ssl_policy, "true").newGraphDatabase();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> graphDb.shutdown()));
     }
 

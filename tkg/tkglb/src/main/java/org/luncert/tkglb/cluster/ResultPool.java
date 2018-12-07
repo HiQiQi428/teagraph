@@ -9,14 +9,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import org.luncert.tkglb.cluster.bean.Result;
-import org.luncert.tkglb.cluster.bean.Task;
 import org.springframework.stereotype.Component;
 
 /**
- * ok
+ * 任务池,用于存储任务执行结果,并在合并后返回给客户端
  */
 @Component
-public class TaskPool {
+public class ResultPool {
 
     /**
      * <li>任务组,因为添加task和添加result的操作都各自发生在单个线程中,不需要同步</li>
@@ -24,16 +23,13 @@ public class TaskPool {
      */
     private static class Group {
 
-        private List<Task> tasks = new ArrayList<>();
+        private int taskSize;
         private List<Result> results = new ArrayList<>();
         private Consumer<String> callback;
 
-        Group(Consumer<String> callback) {
+        Group(int taskSize, Consumer<String> callback) {
+            this.taskSize = taskSize;
             this.callback = callback;
-        }
-
-        void addWaitingTask(Task task) {
-            tasks.add(task);
         }
 
         void addTaskResult(Result result) {
@@ -43,7 +39,7 @@ public class TaskPool {
         }
 
         boolean executeFinished() {
-            return tasks.size() == results.size();
+            return taskSize == results.size();
         }
 
         /**
@@ -74,8 +70,8 @@ public class TaskPool {
      * @param gid
      * @param callback
      */
-    public void newGroup(int gid, Consumer<String> callback) {
-        Group g = new Group(callback);
+    public void newGroup(int gid, int taskSize, Consumer<String> callback) {
+        Group g = new Group(taskSize, callback);
         groups.put(gid, g);
     }
 
@@ -84,15 +80,6 @@ public class TaskPool {
         if (g == null)
             throw new NoSuchElementException("Invalid group ID: " + gid);
         return g;
-    }
-
-    /**
-     * 添加任务到所属任务组
-     * @param task
-     */
-    public void addWaitingTask(Task task) {
-        int gid = task.getGroupId();
-        getGroup(gid).addWaitingTask(task);
     }
 
     /**

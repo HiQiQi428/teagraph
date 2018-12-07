@@ -6,6 +6,9 @@ import org.luncert.mullog.Mullog;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+/**
+ * Processor日志输出
+ */
 @Aspect
 @Component
 public class ProcessorAspect {
@@ -15,7 +18,7 @@ public class ProcessorAspect {
 
     @Before("execution(public * org.luncert.tkglb.cluster.Processor.execute(..)) && args(query,..)")
     public void beforeExecute(String query) {
-        mullog.info("Processor processing: " + query);
+        mullog.info("Processor:", "processing " + query);
     }
 
 }
