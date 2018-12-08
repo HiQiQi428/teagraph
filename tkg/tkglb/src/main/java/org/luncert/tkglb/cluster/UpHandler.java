@@ -3,6 +3,7 @@ package org.luncert.tkglb.cluster;
 import org.luncert.tkglb.cluster.bean.DBNode;
 import org.luncert.tkglb.cluster.bean.Result;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import io.netty.channel.ChannelHandlerAdapter;
@@ -13,6 +14,7 @@ import io.netty.util.AttributeKey;
 /**
  * 用于连接数据库节点
  */
+@Scope("prototype")
 @Component
 public class UpHandler extends ChannelHandlerAdapter {
 
@@ -40,9 +42,9 @@ public class UpHandler extends ChannelHandlerAdapter {
     }
 
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        assert(msg instanceof Result);
+        Result result = Result.fromJSONString((String) msg);
         Attribute<DBNode> attr = ctx.attr(NETTY_DBNODE_KEY);
-        resultPool.addTaskResult((Result) msg);
+        resultPool.addTaskResult(result);
         attr.get().executeFinished();
     }
 

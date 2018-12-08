@@ -1,14 +1,10 @@
 package org.luncert.tkglb.cluster.bean;
 
-import java.io.IOException;
-import java.io.StringReader;
-import java.util.Properties;
+import com.alibaba.fastjson.JSON;
 
-import lombok.Getter;
-import lombok.ToString;
+import lombok.Data;
 
-@Getter
-@ToString
+@Data
 public class Result {
 
     /**
@@ -23,27 +19,12 @@ public class Result {
 
     private String content;
 
-    public String toPropsString() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("taskId=").append(taskId).append('\n')
-                .append("groupId=").append(groupId).append('\n')
-                .append("content=").append(content);
-        return builder.toString();
+    public String toJSONString() {
+        return JSON.toJSONString(this);
     }
 
-    public static Result fromPropsString(String raw) throws IOException {
-        Result result = new Result();
-        Properties props = new Properties();
-        props.load(new StringReader(raw));
-        props.forEach((key, value) -> {
-            if (key.equals("taskId"))
-                result.taskId = Integer.valueOf((String) value);
-            else if (key.equals("groupId"))
-                result.groupId = Integer.valueOf((String) value);
-            else
-                result.content = (String) value;
-        });
-        return result;
+    public static Result fromJSONString(String raw) {
+        return JSON.parseObject(raw, Result.class);
     }
 
 }

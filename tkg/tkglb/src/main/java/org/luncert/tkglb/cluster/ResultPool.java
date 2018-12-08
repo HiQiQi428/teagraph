@@ -56,7 +56,7 @@ public class ResultPool {
             });
             StringBuilder builder = new StringBuilder();
             for (int i = 0, limit = results.size(); i < limit; i++) {
-                builder.append(results.get(i));
+                builder.append(results.get(i).getContent());
             }
             return builder.toString();
         }

@@ -1,6 +1,7 @@
 package org.luncert.tkglb.cluster;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import io.netty.buffer.ByteBuf;
@@ -18,6 +19,7 @@ import io.netty.util.CharsetUtil;
  * HTTP ChannelHandler
  * 异步响应客户端数据库操作请求
  */
+@Scope("prototype")
 @Component
 public class DownHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
@@ -38,6 +40,12 @@ public class DownHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
                 rep = new DefaultFullHttpResponse(HttpVersion.HTTP_1_0, HttpResponseStatus.INTERNAL_SERVER_ERROR);
             }
             ctx.writeAndFlush(rep);
+            
+            try {
+                ctx.close().sync();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         });
     }
 

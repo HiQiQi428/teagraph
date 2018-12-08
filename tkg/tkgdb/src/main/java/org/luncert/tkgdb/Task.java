@@ -1,8 +1,6 @@
-package org.luncert.tkglb.cluster.bean;
+package org.luncert.tkgdb;
 
 import com.alibaba.fastjson.JSON;
-
-import org.luncert.tkglb.cypher.CPiece;
 
 import lombok.Data;
 
@@ -19,8 +17,8 @@ public class Task {
         this.piece = piece;
     }
 
-    public String toJSONString() {
-        return JSON.toJSONString(this);
+    public static Task fromJSONString(String raw) {
+        return JSON.parseObject(raw, Task.class);
     }
 
 }

@@ -13,8 +13,8 @@ public class CPiece {
         None, Union, UnionAll
     }
 
-    private PieceType pieceType = PieceType.Read;
-    private UnionType unionType = UnionType.None;
+    private PieceType pieceType;
+    private UnionType unionType;
     private String content;
 
 }

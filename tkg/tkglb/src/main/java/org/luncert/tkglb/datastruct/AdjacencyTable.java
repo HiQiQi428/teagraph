@@ -25,9 +25,11 @@ public class AdjacencyTable<K, V> {
      */
     public V get(K key) {
         List<V> list = map.get(key);
-        synchronized(list) {
-            if (list != null && !list.isEmpty()) {
-                return list.get(0);
+        if (list != null) {
+            synchronized(list) {
+                if (!list.isEmpty()) {
+                    return list.get(0);
+                }
             }
         }
         return null;

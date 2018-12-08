@@ -1,16 +1,13 @@
 package org.luncert.tkgdb;
 
-import java.io.StringReader;
-import java.util.Properties;
-
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Result;
 import org.neo4j.graphdb.Transaction;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
@@ -25,7 +22,7 @@ public class TKGWorker {
     private static String host = "127.0.0.1";
     private static int port = 8898;
 
-    private class ClientHandler extends ChannelHandlerAdapter {
+    private class ClientHandler extends ChannelInboundHandlerAdapter {
 
         private final GraphDatabaseService graphDB = GraphDB.getInstance();
         
@@ -45,15 +42,11 @@ public class TKGWorker {
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            Properties props = new Properties();
-            props.load(new StringReader((String) msg));
-            int taskId = Integer.valueOf(props.getProperty("taskId"));
-            int groupId = Integer.valueOf(props.getProperty("groupId"));
-            String query = props.getProperty("query");
-            Result execResult = execute(query);
-            TaskResult result = new TaskResult(taskId, groupId,
+            Task task = Task.fromJSONString((String) msg);
+            Result execResult = execute(task.getPiece().getContent());
+            TaskResult result = new TaskResult(task.getTaskId(), task.getGroupId(),
                         execResult == null ? null : execResult.resultAsString());
-            ctx.writeAndFlush(result.toPropsString());
+            ctx.writeAndFlush(result.toJSONString());
         }
 
     }

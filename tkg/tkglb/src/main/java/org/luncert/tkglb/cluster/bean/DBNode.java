@@ -39,7 +39,7 @@ public class DBNode {
             changeStatus(NodeStatus.Reading);
             readTime++;
         }
-        channel.writeAndFlush(task.toPropsString());
+        channel.writeAndFlush(task.toJSONString());
     }
 
     public void executeFinished() {
