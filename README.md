@@ -1,8 +1,12 @@
 # teagraph
 
+![Shippable branch](https://img.shields.io/shippable/5444c5ecb904a4b21567b0ff/master.svg) ![Maven metadata URI](https://img.shields.io/maven-metadata/v/http/central.maven.org/maven2/com/google/code/gson/gson/maven-metadata.xml.svg)
+
+-------
+
 ## 这是
 
-名称嘛……分布式图数据库中间件！其实就是在很多台机上部署一个 neo4j，然后通过中间件实现读写分离。第一阶段的目标是读写分离，第二阶段的目标是负载均衡，然后是还没有考虑。
+名称嘛……分布式图数据库中间件！其实就是在多台机子上部署一个 neo4j，然后通过中间件实现读写分离。第一阶段的目标是读写分离，第二阶段的目标是负载均衡，然后是还没有考虑。
 
 ## 模块
 
@@ -55,3 +59,10 @@ neo4j 是否可以并发执行任务呢？并发时能性能能提升多少呢�
 
 ## 实际跑起来！！！
 
+![demo4](doc/image/demo4.png)
+
+右上角在 python 里使用 requests 发送 query，可以看到发送的是```Match (n) Return n```，由于数据库是空的，所以返回时也是空的。左上角是 tkgdb，下半部分是 tkglb。只是跑起来了/哭……通过读写分离提高 neo4j 性能的目的可能还没有达到。
+
+
+
+じゃね！
