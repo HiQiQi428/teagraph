@@ -8,12 +8,6 @@
   <version>1.0</version>
 
   <name>cypher</name>
-    
-  <parent>
-      <groupId>org.luncert</groupId>
-      <artifactId>teagraph</artifactId>
-      <version>1.0</version>
-  </parent>
 
   <dependencies>
     <dependency>
