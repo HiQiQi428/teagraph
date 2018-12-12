@@ -73,6 +73,11 @@
             <artifactId>mullog</artifactId>
             <version>1.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.luncert</groupId>
+            <artifactId>configer</artifactId>
+            <version>1.0</version>
+        </dependency>
     </dependencies>
     <build>
         <pluginManagement>
