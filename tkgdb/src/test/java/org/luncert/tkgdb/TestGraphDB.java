@@ -28,7 +28,9 @@ public class TestGraphDB {
 
     @Test
     public void test() {
-        System.out.println(execute("MATCH (n) RETURN n").resultAsString());
+        Result result = execute("MATCH (n) RETURN n");
+        System.out.println(result.columns());
+        // result.accept(visitor);
     }
     
 }

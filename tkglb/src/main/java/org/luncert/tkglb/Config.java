@@ -20,7 +20,7 @@ public class Config {
     public Configure configure() {
         String configPath = Paths.get(System.getProperty("user.dir"), "config").toString();
         return new ConfigureFactory(configPath)
-                    .allowLog(false)
+                    .allowLog(true)
                     .interval(1000)
                     .build();
     }

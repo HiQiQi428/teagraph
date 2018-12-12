@@ -28,6 +28,7 @@ public class NettyEngine {
     public void run_forever() {
         try {
             ChannelFuture f = bootstrap.bind(port).sync();
+            // Runtime.getRuntime().addShutdownHook(new Thread(() -> clear()));
             f.channel().closeFuture().sync();
         } catch (InterruptedException e) {
             e.printStackTrace();

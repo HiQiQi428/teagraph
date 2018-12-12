@@ -1,6 +1,8 @@
 package org.luncert.tkglb.cluster;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.BeansException;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
 
 import io.netty.channel.ChannelInitializer;
@@ -11,10 +13,11 @@ import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 
 @Component
-public class DownInitializer extends ChannelInitializer<SocketChannel> {
+public class DownInitializer
+        extends ChannelInitializer<SocketChannel>
+        implements ApplicationContextAware {
 
-    @Autowired
-    DownHandler downHandler;
+    private ApplicationContext ctx;
 
     @Override
     protected void initChannel(SocketChannel ch) throws Exception {
@@ -22,7 +25,13 @@ public class DownInitializer extends ChannelInitializer<SocketChannel> {
         p.addLast(new HttpResponseEncoder());
         p.addLast(new HttpRequestDecoder());
         p.addLast(new HttpObjectAggregator(10 * 1024 * 1024));
-        p.addLast(downHandler);
+        p.addLast(ctx.getBean(DownHandler.class));
     }
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        if (ctx == null)
+            ctx = applicationContext;
+	}
 
 }
