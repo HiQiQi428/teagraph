@@ -1,4 +1,4 @@
-package org.luncert.tkgdb;
+package org.luncert.tkgdb.util;
 
 import org.jboss.marshalling.MarshallerFactory;
 import org.jboss.marshalling.Marshalling;

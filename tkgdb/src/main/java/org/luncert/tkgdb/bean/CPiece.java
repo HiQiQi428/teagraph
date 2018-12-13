@@ -1,4 +1,4 @@
-package org.luncert.tkgdb;
+package org.luncert.tkgdb.bean;
 
 import lombok.Data;
 

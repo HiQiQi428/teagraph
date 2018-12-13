@@ -1,8 +1,9 @@
 package org.luncert.tkgdb;
 
-import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.graphdb.Result;
-import org.neo4j.graphdb.Transaction;
+import org.luncert.tkgdb.bean.CPiece;
+import org.luncert.tkgdb.bean.Dict;
+import org.luncert.tkgdb.util.LoadAvgUtil;
+import org.luncert.tkgdb.util.MarshallingCodeCFactory;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -29,29 +30,20 @@ public class TKGWorker {
 
     private class ClientHandler extends ChannelInboundHandlerAdapter {
 
-        private final GraphDatabaseService graphDB = GraphDB.getInstance();
-        
-        private Result execute(String query) {
-            Result result = null;
-            Transaction tx = graphDB.beginTx();
-            try {
-                result = graphDB.execute(query);
-                tx.success();
-            } catch (Exception e) {
-                tx.failure();
-            } finally {
-                tx.close();
-            }
-            return result;
-        }
+        private final GraphDB graphDB = GraphDB.getInstance();
 
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            Task task = Task.fromJSONString((String) msg);
-            Result execResult = execute(task.getPiece().getContent());
-            TaskResult result = new TaskResult(task.getTaskId(), task.getGroupId(),
-                        execResult == null ? null : execResult.resultAsString());
-            ctx.writeAndFlush(result.toJSONString());
+            Dict task = Dict.fromJSONString((String) msg);
+            String query = task.getAttr("pieces", CPiece.class).getContent();
+            Dict rep = new Dict();
+            rep.addAttr("taskId", task.getAttr("taskId"));
+            rep.addAttr("groupId", task.getAttr("groupId"));
+            rep.addAttr("loadAvg", LoadAvgUtil.refresh().getLoadAvg15());
+            graphDB.execute(query, (result) -> {
+                rep.addAttr("result", result == null ? null : result.resultAsString());
+                ctx.writeAndFlush(rep.toJSONString());
+            });
         }
 
     }
