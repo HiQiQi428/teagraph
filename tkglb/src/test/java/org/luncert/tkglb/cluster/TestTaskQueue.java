@@ -24,6 +24,7 @@ public class TestTaskQueue {
                         .unionType(UnionType.None)
                         .content(null).build();
                         pieces.add(piece);
+                        
         for (int i = 0, limit = random.nextInt(5); i < limit; i++) {
             piece = CPiece.builder()
                         .pieceType(random.nextBoolean() ? PieceType.Read : PieceType.Update)
@@ -35,7 +36,7 @@ public class TestTaskQueue {
     }
 
     /**
-     * 在并发换测试TaskQueue的enQueue,deQueue,waitForTask三个方法
+     * 在并发环境中测试TaskQueue的enQueue，deQueue，waitForTask三个方法
      * 
      * @throws InterruptedException
      */

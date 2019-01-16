@@ -9,6 +9,11 @@ import org.antlr.v4.runtime.tree.ParseTree;
 
 public class CypherAnalyser {
 
+    /**
+     * @param raw cypher语句
+     * @return List&lt;CPiece&gt;
+     * @throws Exception
+     */
     public static List<CPiece> analyse(String raw) throws Exception {
         CharStream input = CharStreams.fromString(raw);
         CypherLexer lexer = new CypherLexer(input);

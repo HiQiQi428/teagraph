@@ -10,6 +10,9 @@ import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
 
+/**
+ * 没有用到
+ */
 public class EventDispatcher {
 
     public static class Params {

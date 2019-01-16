@@ -47,7 +47,7 @@ public class LinkedQueue<E> {
     }
 
     public void reverse() {
-        
+        throw new UnsupportedOperationException("not suppoted now");
     }
 
     /**

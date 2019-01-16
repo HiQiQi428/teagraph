@@ -36,14 +36,20 @@ public class TKGWorker {
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             Dict task = Dict.fromJSONString((String) msg);
             String query = task.getAttr("pieces", CPiece.class).getContent();
+
             Dict rep = new Dict();
+
             rep.addAttr("taskId", task.getAttr("taskId"));
             rep.addAttr("groupId", task.getAttr("groupId"));
             rep.addAttr("loadAvg", LoadAvgUtil.refresh().getLoadAvg15());
-            graphDB.execute(query, (result) -> {
-                rep.addAttr("result", result == null ? null : result.resultAsString());
-                ctx.writeAndFlush(rep.toJSONString());
-            });
+
+            graphDB.execute(query,
+                (result) -> {
+                    rep.addAttr("result", result == null ?
+                        null : result.resultAsString());
+                    ctx.writeAndFlush(rep.toJSONString());
+                }
+            );
         }
 
     }

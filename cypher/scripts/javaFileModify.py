@@ -1,3 +1,7 @@
+'''
+修改src/main/java/org/luncert/cypher/grammar目录下所有java文件的package行
+'''
+
 import os
 
 path = os.getcwd()

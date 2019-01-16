@@ -31,8 +31,7 @@ public class DBPool implements Iterable<DBNode> {
      * 使用最小堆支持选择读次数最少的可用节点的操作 {@link #getReadyDBNode()}
      * 存在一个问题,最小堆同胞节点不是有序的,而取可用节点的操作会先查看左孩子,再查看右孩子,所以可能返回的不是readTime最小的节点
      */
-    private BiHeap<Integer, DBNode> dbs = new BiHeap<>(true,
-        (a, b) -> (a > b ? 1 : (a < b ? -1 : 0)));
+    private BiHeap<DBNode> dbs = new BiHeap<>(true);
     
     /**
      * 索引表,映射nodeId到其绑定的DBNode在最小堆中的位置
@@ -61,10 +60,11 @@ public class DBPool implements Iterable<DBNode> {
             String name = method.getName();
             DBNode node = (DBNode) obj;
             Object object = proxy.invokeSuper(obj, args);
-            // 拦截execute,executeFinished,disconnected调用
+
+            // 拦截execute，executeFinished，disconnected调用，对节点状态进行更新
             if (name.equals("execute")) {
                 Integer i = index.get(node.getId());
-                dbs.update(i, node.getReadTime());
+                dbs.update(i);
                 triggerAction(node);
             }
             else if (name.equals("executeFinished")) {
@@ -73,6 +73,7 @@ public class DBPool implements Iterable<DBNode> {
             else if (name.equals("disconnected")) {
                 delete(node.getId());
             }
+
             return object;
 		}
 
@@ -88,7 +89,7 @@ public class DBPool implements Iterable<DBNode> {
         if (action != null && action.status.equals(node.getStatus())) {
             action.execute(node);
             actions.dequeue(nodeId);
-            // 该action队列完成,通知阻塞在getReadyDBNode方法的线程
+            // 该action队列完成，通知阻塞在getReadyDBNode方法的线程
             if (actions.getQueueSize(nodeId) == 0 && waitingReadyNode) {
                 synchronized(this) {
                     notify();
@@ -135,8 +136,9 @@ public class DBPool implements Iterable<DBNode> {
     }
 
     public DBPool() {
-        dbs.registerListener((newIndex, node) -> 
-            index.put(node.getId(), newIndex));
+        dbs.registerListener(
+            (newIndex, node) -> 
+                index.put(node.getId(), newIndex));
     }
 
     /**
@@ -149,7 +151,7 @@ public class DBPool implements Iterable<DBNode> {
         enhancer.setSuperclass(DBNode.class);
         enhancer.setCallback(methodInterceptor);
         DBNode node = (DBNode) enhancer.create(new Class[]{Channel.class}, new Object[]{channel});
-        dbs.insert(node.getReadTime(), node);
+        dbs.insert(node);
         return node;
     }
 
@@ -160,7 +162,7 @@ public class DBPool implements Iterable<DBNode> {
      */
     public DBNode getDBNode(String nodeId) {
         Integer i = index.get(nodeId);
-        return (i != null) ? dbs.get(i) : null;
+        return (i != null) ? (DBNode) dbs.get(i) : null;
     }
 
     /**
@@ -178,8 +180,8 @@ public class DBPool implements Iterable<DBNode> {
 
     private DBNode getReadyDBNodeNonBlock() {
         DBNode dbNode;
-        for (Node<Integer, DBNode> node : dbs) {
-            dbNode = node.getValue();
+        for (Node node : dbs) {
+            dbNode = (DBNode) node;
             if (dbNode.getStatus() == NodeStatus.Ready
                 && actions.getQueueSize(dbNode.getId()) == 0)
             {
@@ -202,7 +204,7 @@ public class DBPool implements Iterable<DBNode> {
         if (dbNode == null) {
             synchronized(this) {
                 waitingReadyNode = true;
-                wait();
+                wait(); // 在triggerAction被唤醒
                 waitingReadyNode = false;
             }
             dbNode = getReadyDBNodeNonBlock();
@@ -216,6 +218,11 @@ public class DBPool implements Iterable<DBNode> {
         return dbs.size();
     }
 
+    /**
+     * 删除节点
+     * @param nodeId 节点id
+     * @return
+     */
     public DBNode delete(String nodeId) {
         Integer i = index.get(nodeId);
         if (i != null) {
@@ -237,14 +244,14 @@ public class DBPool implements Iterable<DBNode> {
     
     private class Itr implements Iterator<DBNode> {
 
-        Iterator<Node<Integer, DBNode>> iterator = dbs.iterator();
+        Iterator<Node> iterator = dbs.iterator();
 
         public boolean hasNext() {
             return iterator.hasNext();
         }
 
         public DBNode next() {
-            return iterator.next().getValue();
+            return (DBNode) iterator.next();
         }
 
     }

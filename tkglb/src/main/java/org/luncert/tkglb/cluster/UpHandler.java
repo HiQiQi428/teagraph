@@ -18,8 +18,8 @@ import io.netty.util.AttributeKey;
 @Component
 public class UpHandler extends ChannelHandlerAdapter {
 
-    public static final AttributeKey<DBNode> NETTY_DBNODE_KEY = AttributeKey.valueOf("netty.dbnode");
-
+    public static final AttributeKey<DBNode> NETTY_DBNODE_KEY
+        = AttributeKey.valueOf("netty.dbnode");
 
     @Autowired
     private DBPool dbs;
@@ -45,6 +45,8 @@ public class UpHandler extends ChannelHandlerAdapter {
         Result result = Result.fromJSONString((String) msg);
         Attribute<DBNode> attr = ctx.attr(NETTY_DBNODE_KEY);
         resultPool.addTaskResult(result);
+
+        // 转换节点状态
         attr.get().executeFinished();
     }
 

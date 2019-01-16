@@ -9,7 +9,7 @@ import java.io.Reader;
 import lombok.Data;
 
 /**
- * 获取平均负载
+ * 获取平均负载，未使用
  */
 public class LoadAvgUtil {
     

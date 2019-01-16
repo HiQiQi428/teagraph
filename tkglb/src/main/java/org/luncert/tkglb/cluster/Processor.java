@@ -9,7 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * 处理客户端请求
+ * 处理客户端请求，调用{@code CypherAnalyser}
+ * 解析cypher语句，提交到任务队列，并在ResultPool
+ * 中创建任务组
  */
 @Component
 public class Processor {

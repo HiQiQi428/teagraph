@@ -78,10 +78,16 @@ public class TaskQueue {
         }
     }
 
+    /**
+     * 等待新任务到来
+     * @throws InterruptedException
+     */
     public void waitForTask() throws InterruptedException {
-        synchronized(this) {
-            if (size == 0)
-                wait();
+        if (size == 0) {
+            synchronized(this) {
+                if (size == 0)
+                    wait();
+            }
         }
     }
 

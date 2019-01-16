@@ -25,6 +25,12 @@ public class DownInitializer
         p.addLast(new HttpResponseEncoder());
         p.addLast(new HttpRequestDecoder());
         p.addLast(new HttpObjectAggregator(10 * 1024 * 1024));
+        
+        /*
+        每次开始一个新的channel，都需要一个新的
+        DownHandler，不然netty会报错，所以DownHandler
+        本身也是多例模式的。
+        */
         p.addLast(ctx.getBean(DownHandler.class));
     }
 

@@ -13,11 +13,13 @@ public class Config {
 
     @Bean
     public Mullog mullog() {
-        return new Mullog("console"); // Mullog需要优化
+        // mullog是我自己写的日志工具，有不合理的地方。。。需要优化
+        return new Mullog("console");
     }
 
     @Bean
     public Configure configure() {
+        // configer也是我写的配置管理工具，能用。。。
         String configPath = Paths.get(System.getProperty("user.dir"), "config").toString();
         return new ConfigureFactory(configPath)
                     .allowLog(true)

@@ -25,6 +25,9 @@ public class NettyEngine {
                 .childHandler(initializer);
     }
 
+    /**
+     * 启动并阻塞
+     */
     public void run_forever() {
         try {
             ChannelFuture f = bootstrap.bind(port).sync();

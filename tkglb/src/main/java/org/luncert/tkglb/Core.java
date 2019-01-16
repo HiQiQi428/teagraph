@@ -11,12 +11,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class Core {
 
+    // 任务分发线程运行在upEngine的线程组中
     @Autowired
     private TaskDispatcher taskDispatcher;
 
+    // 用于初始化upEngine
     @Autowired
     private UpInitializer upInitializer;
 
+    // 用于初始化downEngine
     @Autowired
     private DownInitializer downInitializer;
 

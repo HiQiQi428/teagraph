@@ -1,13 +1,7 @@
 package org.luncert.tkglb.cluster.bean;
 
 /**
- * Ready -> Reading
- * Ready -> Updating
- * Ready -> Invaliable
- * Reading -> Ready
- * Reading -> Invaliable
- * Updating -> Ready
- * Updating -> Invaliable
+ * 状态转换见doc目录
  */
 public enum NodeStatus {
 

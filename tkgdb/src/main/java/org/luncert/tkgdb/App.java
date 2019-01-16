@@ -7,7 +7,6 @@ import org.luncert.configer.ConfigureFactory;
 
 public final class App {
 
-
     public static void main(String[] args) throws InterruptedException {
         String configPath = Paths.get(System.getProperty("user.dir"), "config").toString();
         Configure config = new ConfigureFactory(configPath)

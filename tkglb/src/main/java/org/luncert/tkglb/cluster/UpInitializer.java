@@ -23,6 +23,12 @@ public class UpInitializer
         p.addLast(MarshallingCodeCFactory.buildMarshallingEncoder());
         p.addLast(MarshallingCodeCFactory.buildMarshallingDecoder());
         // p.addLast(new LoggingHandler(LogLevel.INFO));
+        
+        /*
+        每次开始一个新的channel，都需要一个新的
+        UpHandler，不然netty会报错，所以UpHandler
+        本身也是多例模式的。
+        */
         p.addLast(ctx.getBean(UpHandler.class));
     }
 

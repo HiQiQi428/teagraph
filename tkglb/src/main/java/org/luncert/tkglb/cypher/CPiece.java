@@ -3,6 +3,9 @@ package org.luncert.tkglb.cypher;
 import lombok.Builder;
 import lombok.Data;
 
+/**
+ * 存储从Cypher AST中解析出的一条SingleQuery
+ */
 @Data
 @Builder
 public class CPiece {

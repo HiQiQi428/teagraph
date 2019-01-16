@@ -67,8 +67,8 @@ public class ResultPool {
 
     /**
      * 创建新的任务组,当任务组所有的任务都执行结束后调用callback,并自动删除任务组
-     * @param gid
-     * @param callback
+     * @param gid 任务组id，由{@code TaskQueue}生成
+     * @param callback 任务组结束处理函数
      */
     public void newGroup(int gid, int taskSize, Consumer<String> callback) {
         Group g = new Group(taskSize, callback);

@@ -4,6 +4,9 @@ import com.alibaba.fastjson.JSON;
 
 import lombok.Data;
 
+/**
+ * 描述任务执行结果
+ */
 @Data
 public class Result {
 
@@ -17,6 +20,9 @@ public class Result {
      */
     private int groupId;
 
+    /**
+     * payload
+     */
     private String content;
 
     public String toJSONString() {
